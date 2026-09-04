@@ -15,6 +15,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { ConstructionAction } from '../components/ConstructionAction';
 import { ANIMAL_OPTIONS, CONSTRUCTION_ACTION_IDS, NAME_OPTIONS } from '../constants/crew';
+import { useAuth } from '../lib/auth';
+import {
+  fetchActiveRoomSessions,
+  heartbeatRoomSession,
+  joinRoom,
+  leaveRoom,
+  roomSessionToCrewMember,
+  subscribeToRoomSessions,
+  updateRoomSession,
+  type RoomSession,
+  type RoomStatus,
+} from '../lib/room-realtime';
+import { supabase } from '../lib/supabase';
 import type { AnimalAnimationState, ConstructionActionId, CrewMember } from '../types/crew';
 
 const TASKS = [
@@ -41,9 +54,9 @@ const SUPPORT_MESSAGES = [
 
 const MAX_PUNCHES_PER_USER = 2;
 const MAX_PUNCHERS_PER_HELP_REQUEST = 4;
+const HEARTBEAT_MS = 20_000;
 
 type Task = (typeof TASKS)[number];
-type RoomStatus = 'working' | 'help' | 'done';
 type SupportKind = 'push' | 'punch';
 
 type BoardItem = {
@@ -79,6 +92,10 @@ function isTask(value: unknown): value is Task {
   return typeof value === 'string' && TASKS.some((task) => task === value);
 }
 
+function isNpc(member: CrewMember) {
+  return member.id.startsWith('npc-');
+}
+
 function makeCrewMember(id: string, action: ConstructionActionId, isMe = false): CrewMember {
   return {
     id,
@@ -89,10 +106,12 @@ function makeCrewMember(id: string, action: ConstructionActionId, isMe = false):
   };
 }
 
-function makeCrew(): CrewMember[] {
+function makeLocalCrew(): CrewMember[] {
   const actions = shuffle(CONSTRUCTION_ACTION_IDS).slice(0, 4);
 
-  return actions.map((action, index) => makeCrewMember(index === 0 ? 'me' : `helper-${index}`, action, index === 0));
+  return actions.map((action, index) =>
+    makeCrewMember(index === 0 ? 'me' : `npc-${index}`, action, index === 0),
+  );
 }
 
 function makeBoardItem(member: CrewMember, task: Task, kind: RoomStatus = 'working'): BoardItem {
@@ -106,15 +125,16 @@ function makeBoardItem(member: CrewMember, task: Task, kind: RoomStatus = 'worki
   return {
     id: member.id,
     animal: member.animal,
-    helper: !member.isMe,
+    helper: isNpc(member),
     kind,
     name: member.name,
     text,
   };
 }
 
-function makeInitialBoard(crew: CrewMember[], myTask: Task): BoardItem[] {
-  return crew.map((member) => makeBoardItem(member, member.isMe ? myTask : pick(TASKS)));
+function makeSessionBoardItem(session: RoomSession): BoardItem {
+  const task = isTask(session.task) ? session.task : '其他事項';
+  return makeBoardItem(roomSessionToCrewMember(session), task, session.status);
 }
 
 function boardKindToAnimationState(kind: RoomStatus): AnimalAnimationState {
@@ -123,7 +143,14 @@ function boardKindToAnimationState(kind: RoomStatus): AnimalAnimationState {
 
 function CrewCharacter({ member, state = 'working' }: CrewCharacterProps) {
   const isPaused = state === 'idle';
-  const stateLabel = state === 'done' ? '完成了' : state === 'idle' ? '等待幫忙' : state === 'pushed' ? '被推了一把' : '被揍醒了';
+  const stateLabel =
+    state === 'done'
+      ? '完成了'
+      : state === 'idle'
+        ? '等待幫忙'
+        : state === 'pushed'
+          ? '被推了一把'
+          : '被揍醒了';
 
   return (
     <View style={[styles.crewMember, member.isMe && styles.meMember, isPaused && styles.pausedMember]}>
@@ -134,18 +161,20 @@ function CrewCharacter({ member, state = 'working' }: CrewCharacterProps) {
       <Text numberOfLines={1} style={[styles.crewName, member.isMe && styles.meName]}>
         {member.isMe ? `${member.name}（我）` : member.name}
       </Text>
-      {!member.isMe && <Text style={styles.helperTag}>小幫手</Text>}
+      {isNpc(member) && <Text style={styles.helperTag}>小幫手</Text>}
       {state !== 'working' && <Text style={[styles.stateLabel, isPaused && styles.pausedLabel]}>{stateLabel}</Text>}
     </View>
   );
 }
 
 export default function RoomScreen() {
+  const { session } = useAuth();
   const params = useLocalSearchParams<{ task?: string }>();
   const task: Task = isTask(params.task) ? params.task : '其他事項';
-  const [crew] = useState(makeCrew);
-  const me = crew[0];
-  const helpers = crew.slice(1);
+  const [localCrew] = useState(makeLocalCrew);
+  const me = localCrew[0];
+  const npcPool = localCrew.slice(1);
+  const [liveSessions, setLiveSessions] = useState<RoomSession[]>([]);
   const [status, setStatus] = useState<RoomStatus>('working');
   const [boardOpen, setBoardOpen] = useState(false);
   const [supportIndex, setSupportIndex] = useState(() => Math.floor(Math.random() * SUPPORT_MESSAGES.length));
@@ -153,11 +182,19 @@ export default function RoomScreen() {
   const [supportText, setSupportText] = useState<string | null>(null);
   const [supportKind, setSupportKind] = useState<SupportKind | null>(null);
   const [impactState, setImpactState] = useState<'pushed' | 'punched' | null>(null);
-  const [board, setBoard] = useState<BoardItem[]>(() => makeInitialBoard(crew, task));
   const [supportScale] = useState(() => new Animated.Value(0.92));
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const helpRequestIdRef = useRef(0);
   const punchersRef = useRef(new Set<string>());
+  const roomSessionIdRef = useRef(`room-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+
+  const realHelpers = liveSessions.slice(0, 3).map(roomSessionToCrewMember);
+  const helpers = [...realHelpers, ...npcPool.slice(0, Math.max(0, 3 - realHelpers.length))];
+  const board = [
+    makeBoardItem(me, task, status),
+    ...liveSessions.map(makeSessionBoardItem),
+    ...npcPool.map((member) => makeBoardItem(member, pick(TASKS))),
+  ].slice(0, 4);
 
   const askingHelp = status === 'help';
   const finished = status === 'done';
@@ -176,9 +213,62 @@ export default function RoomScreen() {
     };
   }, []);
 
-  const updateMyBoardStatus = (kind: RoomStatus) => {
-    setBoard((items) => [makeBoardItem(me, task, kind), ...items.filter((item) => item.id !== me.id)].slice(0, 4));
-  };
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+
+    let active = true;
+    const roomSessionId = roomSessionIdRef.current;
+
+    const refresh = async () => {
+      try {
+        const sessions = await fetchActiveRoomSessions(userId);
+        if (active) setLiveSessions(sessions);
+      } catch {
+        if (active) setLiveSessions([]);
+      }
+    };
+
+    const connect = async () => {
+      const { error } = await joinRoom({
+        id: roomSessionId,
+        userId,
+        name: me.name,
+        animal: me.animal,
+        task,
+        status,
+        action: me.action,
+      });
+
+      if (!error) {
+        await refresh();
+      }
+    };
+
+    void connect();
+
+    const channel = subscribeToRoomSessions(() => {
+      void refresh();
+    });
+
+    const heartbeat = setInterval(() => {
+      void heartbeatRoomSession(roomSessionId, userId);
+    }, HEARTBEAT_MS);
+
+    return () => {
+      active = false;
+      clearInterval(heartbeat);
+      void leaveRoom(roomSessionId, userId);
+      void supabase.removeChannel(channel);
+    };
+  }, [me.action, me.animal, me.name, session?.user.id, task]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+
+    void updateRoomSession(roomSessionIdRef.current, userId, { status, task });
+  }, [session?.user.id, status, task]);
 
   const animateSupport = (kind: SupportKind) => {
     supportScale.setValue(0.9);
@@ -190,7 +280,12 @@ export default function RoomScreen() {
       Vibration.vibrate([0, 70, 100, 70], false);
     }
 
-    Animated.spring(supportScale, { bounciness: 18, speed: 23, toValue: 1, useNativeDriver: true }).start();
+    Animated.spring(supportScale, {
+      bounciness: 18,
+      speed: 23,
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
 
     const resetImpactTimer = setTimeout(() => setImpactState(null), 900);
     timersRef.current.push(resetImpactTimer);
@@ -224,21 +319,24 @@ export default function RoomScreen() {
     const requestId = helpRequestIdRef.current;
     punchersRef.current = new Set();
     setStatus('help');
-    setNotice('已經喊「幫我」了，小幫手正在趕來');
+    setNotice(
+      liveSessions.length > 0
+        ? '房間裡的人會看到你卡住了，小幫手也會補位'
+        : '已經喊「幫我」了，小幫手正在趕來',
+    );
     setSupportText(null);
     setSupportKind(null);
     setImpactState(null);
-    updateMyBoardStatus('help');
 
     const pushTimer = setTimeout(() => {
       if (helpRequestIdRef.current === requestId) {
-        showSupport(helpers[0], 'push');
+        showSupport(npcPool[0], 'push');
       }
     }, 10000);
 
     const punchTimer = setTimeout(() => {
       if (helpRequestIdRef.current === requestId) {
-        showSupport(helpers[1], 'punch', 2);
+        showSupport(npcPool[1], 'punch', 2);
       }
     }, 24000);
 
@@ -254,7 +352,6 @@ export default function RoomScreen() {
     setSupportKind(null);
     setImpactState(null);
     setSupportIndex(1);
-    updateMyBoardStatus('working');
   };
 
   const finishTask = () => {
@@ -267,10 +364,16 @@ export default function RoomScreen() {
     setSupportKind(null);
     setImpactState(null);
     setNotice('完成啦，已經貼到公告欄 🎉');
-    updateMyBoardStatus('done');
   };
 
   const roomTitle = finished ? '任務完成！' : askingHelp ? '卡住了，等待幫忙' : '大家一起施工';
+  const roomSubtitle = askingHelp
+    ? '你先停一下，其他人還在動工'
+    : finished
+      ? '你可以休息了，其他人繼續忙'
+      : realHelpers.length > 0
+        ? `現在有 ${realHelpers.length} 個真人跟你一起施工`
+        : '現在先由小幫手陪你施工';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -297,7 +400,7 @@ export default function RoomScreen() {
             finished && styles.doneRoomCard,
           ]}>
           <Text style={styles.roomTitle}>{roomTitle}</Text>
-          <Text style={styles.roomSubtitle}>{askingHelp ? '你先停一下，其他人還在動工' : finished ? '你可以休息了，小幫手繼續忙' : '四隻夥伴，各自動手把事情往前推'}</Text>
+          <Text style={styles.roomSubtitle}>{roomSubtitle}</Text>
 
           <View style={styles.mainSpot}>
             <CrewCharacter member={me} state={myAnimationState} />
@@ -396,11 +499,15 @@ export default function RoomScreen() {
                 <View style={styles.boardCopy}>
                   <View style={styles.nameRow}>
                     <Text style={styles.boardName}>{item.name}</Text>
-                    {item.helper ? <Text style={styles.boardHelperTag}>小幫手</Text> : <Text style={styles.meTag}>我</Text>}
+                    {item.helper ? (
+                      <Text style={styles.boardHelperTag}>小幫手</Text>
+                    ) : item.id === me.id ? (
+                      <Text style={styles.meTag}>我</Text>
+                    ) : null}
                   </View>
                   <Text style={styles.boardText}>{item.text}</Text>
                 </View>
-                {item.kind === 'working' && (
+                {item.kind === 'working' && item.id !== me.id && (
                   <Pressable style={styles.cheerButton}>
                     <Text style={styles.cheerText}>加油</Text>
                   </Pressable>
