@@ -81,7 +81,7 @@ export async function fetchActiveRoomSessions(userId: string): Promise<RoomSessi
 
 export function subscribeToRoomSessions(onChange: () => void): RealtimeChannel {
   return supabase
-    .channel('room-sessions')
+    .channel(`room-sessions-${Date.now()}-${Math.random()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'room_sessions' },
@@ -97,5 +97,6 @@ export function roomSessionToCrewMember(session: RoomSession): CrewMember {
     name: session.name,
     action: session.action,
     isMe: false,
+    isNpc: false,
   };
 }
