@@ -1,20 +1,32 @@
-import { useRef, useState } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-type BoardItem = {
-  id: string;
-  animal: string;
-  name: string;
-  text: string;
-  kind: 'working' | 'help' | 'done';
-  helper?: boolean;
-};
+import { AnimalCharacter } from '../components/AnimalCharacter';
+import { ConstructionAction } from '../components/ConstructionAction';
+import { ANIMAL_OPTIONS, CONSTRUCTION_ACTION_IDS, NAME_OPTIONS } from '../constants/crew';
+import type { AnimalAnimationState, ConstructionActionId, CrewMember } from '../types/crew';
 
-const ANIMALS = ['🐱', '🐶', '🐰', '🦊', '🐻', '🐼', '🐹', '🐯'];
-const NAMES = ['小橘', '阿灰', '奶糖', '豆包', '栗子', '麻糬', 'Mumu', 'Yuki', '布丁', '小麥', '米米', '阿福'];
-const TASKS = ['整理房間', '讀書', '運動', '工作', '洗衣服', '寫報告', '收桌子'];
+const TASKS = [
+  '打掃房間',
+  '寫報告',
+  '讀書',
+  '工作',
+  '運動',
+  '做家事',
+  '整理東西',
+  '其他事項',
+] as const;
 
 const SUPPORT_MESSAGES = [
   '欸 都進來了 就差真的動手了',
@@ -27,121 +39,304 @@ const SUPPORT_MESSAGES = [
   '做爛也沒差 先做再說',
 ];
 
-function pick<T>(items: T[]) {
+const MAX_PUNCHES_PER_USER = 2;
+const MAX_PUNCHERS_PER_HELP_REQUEST = 4;
+
+type Task = (typeof TASKS)[number];
+type RoomStatus = 'working' | 'help' | 'done';
+type SupportKind = 'push' | 'punch';
+
+type BoardItem = {
+  id: string;
+  animal: string;
+  name: string;
+  text: string;
+  kind: RoomStatus;
+  helper: boolean;
+};
+
+type CrewCharacterProps = {
+  member: CrewMember;
+  state?: AnimalAnimationState;
+};
+
+function pick<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function makeNpc(id: string, kind: BoardItem['kind'] = 'working', helper = false): BoardItem {
-  const task = pick(TASKS);
+function shuffle<T>(items: readonly T[]): T[] {
+  const copy = [...items];
+
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]];
+  }
+
+  return copy;
+}
+
+function isTask(value: unknown): value is Task {
+  return typeof value === 'string' && TASKS.some((task) => task === value);
+}
+
+function makeCrewMember(id: string, action: ConstructionActionId, isMe = false): CrewMember {
   return {
     id,
-    animal: pick(ANIMALS),
-    name: pick(NAMES),
-    kind,
-    helper,
-    text: kind === 'done' ? `完成了「${task}」 🎉` : kind === 'help' ? `做「${task}」卡住了 需要幫忙` : `正在做「${task}」`,
+    action,
+    animal: pick(ANIMAL_OPTIONS),
+    isMe,
+    name: pick(NAME_OPTIONS),
   };
+}
+
+function makeCrew(): CrewMember[] {
+  const actions = shuffle(CONSTRUCTION_ACTION_IDS).slice(0, 4);
+
+  return actions.map((action, index) => makeCrewMember(index === 0 ? 'me' : `helper-${index}`, action, index === 0));
+}
+
+function makeBoardItem(member: CrewMember, task: Task, kind: RoomStatus = 'working'): BoardItem {
+  const text =
+    kind === 'done'
+      ? `完成了「${task}」 🎉`
+      : kind === 'help'
+        ? `做「${task}」卡住了，需要幫忙`
+        : `正在做「${task}」`;
+
+  return {
+    id: member.id,
+    animal: member.animal,
+    helper: !member.isMe,
+    kind,
+    name: member.name,
+    text,
+  };
+}
+
+function makeInitialBoard(crew: CrewMember[], myTask: Task): BoardItem[] {
+  return crew.map((member) => makeBoardItem(member, member.isMe ? myTask : pick(TASKS)));
+}
+
+function boardKindToAnimationState(kind: RoomStatus): AnimalAnimationState {
+  return kind === 'done' ? 'done' : kind === 'help' ? 'idle' : 'working';
+}
+
+function CrewCharacter({ member, state = 'working' }: CrewCharacterProps) {
+  const isPaused = state === 'idle';
+  const stateLabel = state === 'done' ? '完成了' : state === 'idle' ? '等待幫忙' : state === 'pushed' ? '被推了一把' : '被揍醒了';
+
+  return (
+    <View style={[styles.crewMember, member.isMe && styles.meMember, isPaused && styles.pausedMember]}>
+      <View style={styles.characterVisual}>
+        <AnimalCharacter animal={member.animal} size={member.isMe ? 'large' : 'regular'} state={state} />
+        {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
+      </View>
+      <Text numberOfLines={1} style={[styles.crewName, member.isMe && styles.meName]}>
+        {member.isMe ? `${member.name}（我）` : member.name}
+      </Text>
+      {!member.isMe && <Text style={styles.helperTag}>小幫手</Text>}
+      {state !== 'working' && <Text style={[styles.stateLabel, isPaused && styles.pausedLabel]}>{stateLabel}</Text>}
+    </View>
+  );
 }
 
 export default function RoomScreen() {
   const params = useLocalSearchParams<{ task?: string }>();
-  const task = params.task || '一件小事';
-  const [me] = useState(() => ({ animal: pick(ANIMALS), name: pick(NAMES) }));
-  const [finished, setFinished] = useState(false);
-  const [askingHelp, setAskingHelp] = useState(false);
+  const task: Task = isTask(params.task) ? params.task : '其他事項';
+  const [crew] = useState(makeCrew);
+  const me = crew[0];
+  const helpers = crew.slice(1);
+  const [status, setStatus] = useState<RoomStatus>('working');
   const [boardOpen, setBoardOpen] = useState(false);
   const [supportIndex, setSupportIndex] = useState(() => Math.floor(Math.random() * SUPPORT_MESSAGES.length));
   const [notice, setNotice] = useState<string | null>(null);
-  const [pushText, setPushText] = useState<string | null>(null);
-  const pushScale = useRef(new Animated.Value(0.92)).current;
-  const [board, setBoard] = useState<BoardItem[]>(() => [makeNpc('1'), makeNpc('2', 'working', true), makeNpc('3', 'done')]);
+  const [supportText, setSupportText] = useState<string | null>(null);
+  const [supportKind, setSupportKind] = useState<SupportKind | null>(null);
+  const [impactState, setImpactState] = useState<'pushed' | 'punched' | null>(null);
+  const [board, setBoard] = useState<BoardItem[]>(() => makeInitialBoard(crew, task));
+  const [supportScale] = useState(() => new Animated.Value(0.92));
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const helpRequestIdRef = useRef(0);
+  const punchersRef = useRef(new Set<string>());
 
-  const showPush = (text: string, supportMessageIndex: number) => {
-    setPushText(text);
-    setSupportIndex(supportMessageIndex);
-    Vibration.vibrate(90);
-    pushScale.setValue(0.9);
-    Animated.sequence([
-      Animated.spring(pushScale, { toValue: 1.08, useNativeDriver: true, speed: 24, bounciness: 16 }),
-      Animated.spring(pushScale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 10 }),
-    ]).start();
+  const askingHelp = status === 'help';
+  const finished = status === 'done';
+  const myAnimationState: AnimalAnimationState = finished
+    ? 'done'
+    : impactState ?? (askingHelp ? 'idle' : 'working');
+
+  const clearSupportTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
+
+  useEffect(() => {
+    return () => {
+      clearSupportTimers();
+    };
+  }, []);
+
+  const updateMyBoardStatus = (kind: RoomStatus) => {
+    setBoard((items) => [makeBoardItem(me, task, kind), ...items.filter((item) => item.id !== me.id)].slice(0, 4));
+  };
+
+  const animateSupport = (kind: SupportKind) => {
+    supportScale.setValue(0.9);
+    setImpactState(kind === 'push' ? 'pushed' : 'punched');
+
+    if (kind === 'push') {
+      Vibration.vibrate(90);
+    } else {
+      Vibration.vibrate([0, 70, 100, 70], false);
+    }
+
+    Animated.spring(supportScale, { bounciness: 18, speed: 23, toValue: 1, useNativeDriver: true }).start();
+
+    const resetImpactTimer = setTimeout(() => setImpactState(null), 900);
+    timersRef.current.push(resetImpactTimer);
+  };
+
+  const showSupport = (helper: CrewMember, kind: SupportKind, count = 1) => {
+    const limitedCount = Math.min(count, MAX_PUNCHES_PER_USER);
+
+    if (kind === 'punch') {
+      if (punchersRef.current.size >= MAX_PUNCHERS_PER_HELP_REQUEST || punchersRef.current.has(helper.id)) {
+        return;
+      }
+      punchersRef.current.add(helper.id);
+    }
+
+    setSupportKind(kind);
+    setSupportIndex(kind === 'push' ? 4 : 6);
+    setSupportText(
+      kind === 'push'
+        ? `${helper.name} 推你一把 👉`
+        : `${helper.name} 揍了你 ${limitedCount} 下 👊`,
+    );
+    animateSupport(kind);
   };
 
   const askForHelp = () => {
     if (askingHelp || finished) return;
-    setAskingHelp(true);
-    setNotice('已經喊幫我了 先待一下');
-    setPushText(null);
-    setBoard((items) => [
-      { id: `me-help-${Date.now()}`, animal: me.animal, name: me.name, text: `做「${task}」卡住了 需要幫忙`, kind: 'help' },
-      ...items.filter((item) => !item.id.startsWith('me-')),
-    ]);
 
-    setTimeout(() => showPush(`${pick(NAMES)} 推了你一把 👉`, 4), 10000);
-    setTimeout(() => showPush(`${pick(NAMES)} 揍了你一下 × 3 👊`, 6), 24000);
+    clearSupportTimers();
+    helpRequestIdRef.current += 1;
+    const requestId = helpRequestIdRef.current;
+    punchersRef.current = new Set();
+    setStatus('help');
+    setNotice('已經喊「幫我」了，小幫手正在趕來');
+    setSupportText(null);
+    setSupportKind(null);
+    setImpactState(null);
+    updateMyBoardStatus('help');
+
+    const pushTimer = setTimeout(() => {
+      if (helpRequestIdRef.current === requestId) {
+        showSupport(helpers[0], 'push');
+      }
+    }, 10000);
+
+    const punchTimer = setTimeout(() => {
+      if (helpRequestIdRef.current === requestId) {
+        showSupport(helpers[1], 'punch', 2);
+      }
+    }, 24000);
+
+    timersRef.current = [pushTimer, punchTimer];
   };
 
   const resumeWorking = () => {
-    setAskingHelp(false);
-    setNotice('好 回去做');
-    setPushText(null);
+    clearSupportTimers();
+    helpRequestIdRef.current += 1;
+    setStatus('working');
+    setNotice('好，大家繼續一起施工');
+    setSupportText(null);
+    setSupportKind(null);
+    setImpactState(null);
     setSupportIndex(1);
-    setBoard((items) => [
-      { id: `me-working-${Date.now()}`, animal: me.animal, name: me.name, text: `正在做「${task}」`, kind: 'working' },
-      ...items.filter((item) => !item.id.startsWith('me-')),
-    ]);
+    updateMyBoardStatus('working');
   };
 
   const finishTask = () => {
     if (finished) return;
-    setFinished(true);
-    setAskingHelp(false);
-    setPushText(null);
-    setNotice('完成啦 已經貼到公告欄 🎉');
-    setBoard((items) => [
-      { id: `me-done-${Date.now()}`, animal: me.animal, name: me.name, text: `完成了「${task}」 🎉`, kind: 'done' },
-      ...items.filter((item) => !item.id.startsWith('me-')),
-    ]);
+
+    clearSupportTimers();
+    helpRequestIdRef.current += 1;
+    setStatus('done');
+    setSupportText(null);
+    setSupportKind(null);
+    setImpactState(null);
+    setNotice('完成啦，已經貼到公告欄 🎉');
+    updateMyBoardStatus('done');
   };
+
+  const roomTitle = finished ? '任務完成！' : askingHelp ? '卡住了，等待幫忙' : '大家一起施工';
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
           <Text style={styles.brand}>Companion</Text>
-          <Pressable onPress={() => setBoardOpen(true)} style={styles.boardButton}><Text style={styles.boardButtonText}>📌 公告欄</Text></Pressable>
+          <Pressable onPress={() => setBoardOpen(true)} style={styles.boardButton}>
+            <Text style={styles.boardButtonText}>📌 公告欄</Text>
+          </Pressable>
         </View>
 
-        <View style={styles.identityPill}><Text style={styles.identityText}>這次你是 {me.name} {me.animal}</Text></View>
+        <View style={styles.identityPill}>
+          <Text style={styles.identityText}>這次你是 {me.name}</Text>
+          <AnimalCharacter animal={me.animal} size="small" state={myAnimationState} />
+        </View>
 
-        <View style={styles.roomCard}>
-          <Text style={styles.roomTitle}>{finished ? '做完啦' : askingHelp ? '卡住中' : '開工中'}</Text>
-          <View style={styles.scene}>
-            <Text style={styles.wood}>🪵</Text>
-            <View style={styles.youSpot}>
-              <Text style={styles.mainAnimal}>{me.animal}</Text>
-              <Text style={styles.hammer}>{askingHelp ? '🫠' : finished ? '✨' : '🔨'}</Text>
-            </View>
-            <Text style={styles.box}>📦</Text>
+        <View
+          style={[
+            styles.roomCard,
+            askingHelp && styles.helpRoomCard,
+            finished && styles.doneRoomCard,
+          ]}>
+          <Text style={styles.roomTitle}>{roomTitle}</Text>
+          <Text style={styles.roomSubtitle}>{askingHelp ? '你先停一下，其他人還在動工' : finished ? '你可以休息了，小幫手繼續忙' : '四隻夥伴，各自動手把事情往前推'}</Text>
+
+          <View style={styles.mainSpot}>
+            <CrewCharacter member={me} state={myAnimationState} />
           </View>
+
+          <View style={styles.helperRow}>
+            {helpers.map((member) => (
+              <CrewCharacter key={member.id} member={member} />
+            ))}
+          </View>
+
           <Text style={styles.taskLabel}>現在在做</Text>
           <Text style={styles.taskTitle}>{task}</Text>
         </View>
 
         <View style={styles.supportBubble}>
-          <Text style={styles.supportAnimal}>{me.animal}</Text>
-          <Text style={styles.supportText}>{finished ? '靠 真的做完了欸' : SUPPORT_MESSAGES[supportIndex]}</Text>
+          <View style={styles.supportAvatar}>
+            <AnimalCharacter animal={me.animal} size="small" state={myAnimationState} />
+          </View>
+          <Text style={styles.supportMessage}>{finished ? '靠，真的做完了欸' : SUPPORT_MESSAGES[supportIndex]}</Text>
         </View>
 
-        {pushText && (
-          <Animated.View style={[styles.pushCard, { transform: [{ scale: pushScale }] }]}>
-            <Text style={styles.pushBig}>⚡</Text>
-            <Text style={styles.pushText}>{pushText}</Text>
+        {supportText && (
+          <Animated.View
+            style={[
+              styles.supportCard,
+              supportKind === 'punch' && styles.punchCard,
+              { transform: [{ scale: supportScale }] },
+            ]}>
+            <Text style={styles.supportBig}>{supportKind === 'punch' ? '👊👊' : '👉'}</Text>
+            <Text style={styles.supportText}>{supportText}</Text>
           </Animated.View>
         )}
 
-        {notice && <View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
+        {notice && (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>{notice}</Text>
+          </View>
+        )}
 
         {!finished ? (
           <View style={styles.actionsWrap}>
@@ -160,32 +355,57 @@ export default function RoomScreen() {
           </View>
         ) : (
           <View style={styles.actionsWrap}>
-            <Pressable onPress={() => setBoardOpen(true)} style={styles.helpButton}><Text style={styles.helpText}>看看公告欄</Text></Pressable>
-            <Pressable onPress={() => router.replace('/')} style={styles.doneButton}><Text style={styles.doneText}>再做一件</Text></Pressable>
+            <Pressable onPress={() => setBoardOpen(true)} style={styles.helpButton}>
+              <Text style={styles.helpText}>看看公告欄</Text>
+            </Pressable>
+            <Pressable onPress={() => router.replace('/')} style={styles.doneButton}>
+              <Text style={styles.doneText}>再做一件</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
 
-      <Modal visible={boardOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setBoardOpen(false)}>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setBoardOpen(false)}
+        presentationStyle="pageSheet"
+        visible={boardOpen}>
         <SafeAreaView style={styles.boardSafeArea}>
           <View style={styles.boardHeader}>
             <Text style={styles.boardTitle}>📌 公告欄</Text>
-            <Pressable onPress={() => setBoardOpen(false)} style={styles.closeButton}><Text style={styles.closeText}>關閉</Text></Pressable>
+            <Pressable onPress={() => setBoardOpen(false)} style={styles.closeButton}>
+              <Text style={styles.closeText}>關閉</Text>
+            </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.boardList}>
             {board.map((item) => (
-              <View key={item.id} style={[styles.boardItem, item.kind === 'help' && styles.helpItem, item.kind === 'done' && styles.doneItem]}>
-                <Text style={styles.boardAnimal}>{item.animal}</Text>
+              <View
+                key={item.id}
+                style={[
+                  styles.boardItem,
+                  item.kind === 'help' && styles.helpItem,
+                  item.kind === 'done' && styles.doneItem,
+                ]}>
+                <View style={styles.boardAvatar}>
+                  <AnimalCharacter
+                    animal={item.animal}
+                    size="small"
+                    state={boardKindToAnimationState(item.kind)}
+                  />
+                </View>
                 <View style={styles.boardCopy}>
                   <View style={styles.nameRow}>
                     <Text style={styles.boardName}>{item.name}</Text>
-                    {item.helper && <Text style={styles.helperTag}>小幫手</Text>}
+                    {item.helper ? <Text style={styles.boardHelperTag}>小幫手</Text> : <Text style={styles.meTag}>我</Text>}
                   </View>
                   <Text style={styles.boardText}>{item.text}</Text>
                 </View>
-                {item.kind === 'working' && <Pressable style={styles.cheerButton}><Text style={styles.cheerText}>加油</Text></Pressable>}
-                {item.kind === 'help' && item.name !== me.name && <Pressable style={styles.cheerButton}><Text style={styles.cheerText}>幫他</Text></Pressable>}
-                {item.kind === 'done' && <Pressable style={styles.cheerButton}><Text style={styles.cheerText}>🎉</Text></Pressable>}
+                {item.kind === 'working' && (
+                  <Pressable style={styles.cheerButton}>
+                    <Text style={styles.cheerText}>加油</Text>
+                  </Pressable>
+                )}
+                {item.kind === 'done' && <Text style={styles.doneStamp}>🎉</Text>}
               </View>
             ))}
           </ScrollView>
@@ -197,33 +417,42 @@ export default function RoomScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: '#FFF9F1', flex: 1 },
-  content: { paddingBottom: 36, paddingHorizontal: 24, paddingTop: 14 },
+  content: { paddingBottom: 36, paddingHorizontal: 20, paddingTop: 14 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   backButton: { alignItems: 'center', height: 42, justifyContent: 'center', width: 42 },
   backText: { color: '#6F5748', fontSize: 36, lineHeight: 38 },
   brand: { color: '#493D34', fontSize: 20, fontWeight: '700' },
   boardButton: { padding: 8 },
   boardButtonText: { color: '#765C4D', fontSize: 13, fontWeight: '700' },
-  identityPill: { alignSelf: 'center', backgroundColor: '#F2E3D7', borderRadius: 999, marginTop: 16, paddingHorizontal: 14, paddingVertical: 8 },
+  identityPill: { alignItems: 'center', alignSelf: 'center', backgroundColor: '#F2E3D7', borderRadius: 999, flexDirection: 'row', gap: 5, marginTop: 16, paddingHorizontal: 14, paddingVertical: 6 },
   identityText: { color: '#765C4D', fontSize: 12, fontWeight: '700' },
-  roomCard: { alignItems: 'center', backgroundColor: '#F9E9DB', borderColor: '#E8CEBB', borderRadius: 30, borderWidth: 1, marginTop: 14, padding: 24 },
-  roomTitle: { color: '#745646', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
-  scene: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'center', marginTop: 24, minHeight: 130, width: '100%' },
-  youSpot: { alignItems: 'center', backgroundColor: '#FFF8F1', borderColor: '#D9B9A2', borderRadius: 28, borderWidth: 1, marginHorizontal: 18, padding: 16 },
-  mainAnimal: { fontSize: 76 },
-  hammer: { fontSize: 28, marginTop: -10 },
-  wood: { fontSize: 34, marginBottom: 10 },
-  box: { fontSize: 34, marginBottom: 8 },
-  taskLabel: { color: '#9A8171', fontSize: 11, marginTop: 22 },
-  taskTitle: { color: '#493D34', fontSize: 25, fontWeight: '800', marginTop: 5 },
+  roomCard: { alignItems: 'center', backgroundColor: '#F9E9DB', borderColor: '#E8CEBB', borderRadius: 30, borderWidth: 1, marginTop: 14, paddingHorizontal: 16, paddingVertical: 22, shadowColor: '#8D6750', shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.08, shadowRadius: 16 },
+  helpRoomCard: { backgroundColor: '#FFF0E5', borderColor: '#DFAD8D' },
+  doneRoomCard: { backgroundColor: '#F3EED9', borderColor: '#D6C68E' },
+  roomTitle: { color: '#745646', fontSize: 15, fontWeight: '900', letterSpacing: 0.8 },
+  roomSubtitle: { color: '#987C69', fontSize: 12, lineHeight: 18, marginTop: 6, textAlign: 'center' },
+  mainSpot: { marginTop: 18 },
+  helperRow: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 12, width: '100%' },
+  crewMember: { alignItems: 'center', backgroundColor: '#FFF9F3', borderColor: '#E7D3C4', borderRadius: 18, borderWidth: 1, flex: 1, maxWidth: 108, minHeight: 128, paddingHorizontal: 6, paddingVertical: 10 },
+  meMember: { backgroundColor: '#FFFFFF', borderColor: '#CE9F80', borderRadius: 24, flexGrow: 0, maxWidth: 190, minHeight: 152, paddingHorizontal: 24, paddingVertical: 14, width: 180 },
+  pausedMember: { backgroundColor: '#FFF7F2', borderColor: '#D9906C', borderStyle: 'dashed' },
+  characterVisual: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'center' },
+  crewName: { color: '#5D4A3D', fontSize: 11, fontWeight: '800', marginTop: 4, maxWidth: '100%' },
+  meName: { fontSize: 14, marginTop: 5 },
+  helperTag: { backgroundColor: '#EFE3D8', borderRadius: 7, color: '#896D5B', fontSize: 8, fontWeight: '800', marginTop: 4, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 2 },
+  stateLabel: { color: '#8B7363', fontSize: 10, fontWeight: '700', marginTop: 5 },
+  pausedLabel: { color: '#B35F42' },
+  taskLabel: { color: '#9A8171', fontSize: 11, marginTop: 20 },
+  taskTitle: { color: '#493D34', fontSize: 24, fontWeight: '800', marginTop: 5 },
   supportBubble: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#EDDED2', borderRadius: 22, borderWidth: 1, flexDirection: 'row', marginTop: 18, padding: 18 },
-  supportAnimal: { fontSize: 30, marginRight: 12 },
-  supportText: { color: '#5F4A3E', flex: 1, fontSize: 16, fontWeight: '700', lineHeight: 23 },
-  pushCard: { alignItems: 'center', backgroundColor: '#FFE3B8', borderColor: '#D6944D', borderRadius: 22, borderWidth: 2, marginTop: 14, padding: 20 },
-  pushBig: { fontSize: 34 },
-  pushText: { color: '#5D3A20', fontSize: 18, fontWeight: '900', marginTop: 6, textAlign: 'center' },
+  supportAvatar: { marginRight: 12 },
+  supportMessage: { color: '#5F4A3E', flex: 1, fontSize: 16, fontWeight: '700', lineHeight: 23 },
+  supportCard: { alignItems: 'center', backgroundColor: '#FFE3B8', borderColor: '#D6944D', borderRadius: 22, borderWidth: 2, marginTop: 14, padding: 20 },
+  punchCard: { backgroundColor: '#FFD8CB', borderColor: '#C96B54' },
+  supportBig: { fontSize: 34 },
+  supportText: { color: '#5D3A20', fontSize: 18, fontWeight: '900', marginTop: 6, textAlign: 'center' },
   notice: { alignItems: 'center', backgroundColor: '#F2D9C4', borderRadius: 16, marginTop: 12, padding: 12 },
-  noticeText: { color: '#6E432C', fontSize: 13, fontWeight: '700' },
+  noticeText: { color: '#6E432C', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   actionsWrap: { flexDirection: 'row', gap: 12, marginTop: 22 },
   helpButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#D8C1B0', borderRadius: 18, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 58 },
   helpText: { color: '#765C4D', fontSize: 15, fontWeight: '800' },
@@ -241,12 +470,14 @@ const styles = StyleSheet.create({
   boardItem: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#EDDED2', borderRadius: 20, borderWidth: 1, flexDirection: 'row', padding: 15 },
   helpItem: { backgroundColor: '#FFF0E8', borderColor: '#E3B99E' },
   doneItem: { backgroundColor: '#FFF8E7' },
-  boardAnimal: { fontSize: 34, marginRight: 12 },
+  boardAvatar: { marginRight: 12 },
   boardCopy: { flex: 1 },
   nameRow: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   boardName: { color: '#55483E', fontSize: 14, fontWeight: '800' },
-  helperTag: { backgroundColor: '#EFE3D8', borderRadius: 8, color: '#8A6D5A', fontSize: 9, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 2 },
+  boardHelperTag: { backgroundColor: '#EFE3D8', borderRadius: 8, color: '#8A6D5A', fontSize: 9, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 2 },
+  meTag: { backgroundColor: '#E4EEE0', borderRadius: 8, color: '#57704B', fontSize: 9, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 2 },
   boardText: { color: '#806E62', fontSize: 12, lineHeight: 18, marginTop: 3 },
   cheerButton: { backgroundColor: '#F2E3D7', borderRadius: 12, marginLeft: 8, paddingHorizontal: 11, paddingVertical: 8 },
   cheerText: { color: '#805E49', fontSize: 12, fontWeight: '800' },
+  doneStamp: { fontSize: 22, marginLeft: 8 },
 });
