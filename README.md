@@ -1,6 +1,6 @@
 # Companion App
 
-Minimal Expo Router and TypeScript foundation with Supabase authentication session persistence.
+Expo Router and TypeScript app with Supabase authentication and persistent sessions.
 
 ## Setup
 
@@ -23,6 +23,13 @@ Minimal Expo Router and TypeScript foundation with Supabase authentication sessi
    npx expo start
    ```
 
+## OAuth setup
+
+- In Supabase Authentication, enable the Google provider and add its client credentials.
+- Add the redirect URL produced by Expo's `makeRedirectUri()` to Supabase Authentication → URL Configuration → Redirect URLs. In Expo Go this is an `exp://...` development URL; development builds use the `companionapp://` scheme.
+- Enable the Apple provider in Supabase before testing Sign in with Apple. Native builds are configured with the `expo-apple-authentication` plugin and the iOS Sign in with Apple entitlement.
+- Google and Apple provider credentials belong in the Supabase dashboard. Never put provider secrets or a Supabase service-role key in this app.
+
 ## Checks
 
 Run the TypeScript compiler without emitting files:
@@ -31,4 +38,4 @@ Run the TypeScript compiler without emitting files:
 npm run typecheck
 ```
 
-The login screen is intentionally a placeholder. OAuth and other sign-in flows are not part of this initial foundation.
+Google authentication uses Supabase OAuth. Apple authentication uses the native iOS identity token when it is available; non-iOS platforms remain safe and show a platform notice.

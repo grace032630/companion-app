@@ -39,6 +39,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   loading: {
     alignItems: 'center',
+    backgroundColor: '#FFF9F1',
     flex: 1,
     justifyContent: 'center',
   },
