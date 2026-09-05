@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -157,6 +158,7 @@ export default function RoomScreen() {
   const [status, setStatus] = useState<RoomStatus>('working');
   const [helpRequestId, setHelpRequestId] = useState<string | null>(null);
   const [boardOpen, setBoardOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [supportIndex, setSupportIndex] = useState(() => Math.floor(Math.random() * SUPPORT_MESSAGES.length));
   const [notice, setNotice] = useState<string | null>(null);
   const [supportText, setSupportText] = useState<string | null>(null);
@@ -293,6 +295,22 @@ export default function RoomScreen() {
   }, [roomId, session?.user.id]);
 
   useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (boardOpen) {
+        setBoardOpen(false);
+        return true;
+      }
+      if (leaveOpen) {
+        setLeaveOpen(false);
+        return true;
+      }
+      setLeaveOpen(true);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [boardOpen, leaveOpen]);
+
+  useEffect(() => {
     const userId = session?.user.id;
     if (!userId || !roomId) return;
 
@@ -368,6 +386,14 @@ export default function RoomScreen() {
     if (target) void supportUser(target, kind);
   };
 
+  const confirmLeave = async () => {
+    const userId = session?.user.id;
+    setLeaveOpen(false);
+    clearTimers();
+    if (userId) await leaveRoom(roomSessionIdRef.current, userId);
+    router.replace('/');
+  };
+
   const finishTask = () => {
     const userId = session?.user.id;
     if (finished || !userId) return;
@@ -415,7 +441,7 @@ export default function RoomScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => setLeaveOpen(true)} style={styles.backButton}>
             <Text style={styles.backText}>‹</Text>
           </Pressable>
           <View style={styles.headerCenter}>
@@ -532,6 +558,24 @@ export default function RoomScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      <Modal animationType="fade" onRequestClose={() => setLeaveOpen(false)} transparent visible={leaveOpen}>
+        <View style={styles.leaveOverlay}>
+          <View style={styles.leaveCard}>
+            <Text style={styles.leaveEmoji}>🚪</Text>
+            <Text style={styles.leaveTitle}>要離開施工房嗎？</Text>
+            <Text style={styles.leaveSubtitle}>離開後這次施工會停止</Text>
+            <View style={styles.leaveActions}>
+              <Pressable onPress={() => setLeaveOpen(false)} style={styles.stayButton}>
+                <Text style={styles.stayText}>繼續施工</Text>
+              </Pressable>
+              <Pressable onPress={() => void confirmLeave()} style={styles.leaveButton}>
+                <Text style={styles.leaveText}>離開</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -611,4 +655,14 @@ const styles = StyleSheet.create({
   boardActionText: { color: '#744F39', fontSize: 11, fontWeight: '800' },
   boardPunchButton: { backgroundColor: '#FFD9CC', borderColor: '#D9957D', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   boardPunchText: { color: '#7A4333', fontSize: 11, fontWeight: '900' },
+  leaveOverlay: { alignItems: 'center', backgroundColor: 'rgba(73,61,52,0.34)', flex: 1, justifyContent: 'center', padding: 24 },
+  leaveCard: { alignItems: 'center', backgroundColor: '#FFF9F1', borderRadius: 26, maxWidth: 360, padding: 24, width: '100%' },
+  leaveEmoji: { fontSize: 30 },
+  leaveTitle: { color: '#493D34', fontSize: 19, fontWeight: '900', marginTop: 10 },
+  leaveSubtitle: { color: '#8F7768', fontSize: 13, marginTop: 7 },
+  leaveActions: { flexDirection: 'row', gap: 10, marginTop: 22, width: '100%' },
+  stayButton: { alignItems: 'center', backgroundColor: '#F1E4D9', borderRadius: 15, flex: 1, justifyContent: 'center', minHeight: 50 },
+  stayText: { color: '#674F41', fontSize: 14, fontWeight: '800' },
+  leaveButton: { alignItems: 'center', backgroundColor: '#A86F4D', borderRadius: 15, flex: 1, justifyContent: 'center', minHeight: 50 },
+  leaveText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
 });
