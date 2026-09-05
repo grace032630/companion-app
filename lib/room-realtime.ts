@@ -7,6 +7,7 @@ export type RoomStatus = 'working' | 'help' | 'done';
 
 export type RoomSession = {
   id: string;
+  room_id: string;
   user_id: string;
   name: string;
   animal: string;
@@ -18,6 +19,7 @@ export type RoomSession = {
 
 export type JoinRoomInput = {
   id: string;
+  roomId: string;
   userId: string;
   name: string;
   animal: string;
@@ -28,9 +30,17 @@ export type JoinRoomInput = {
 
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
+export async function assignRoom(maxMembers = 6): Promise<string> {
+  const { data, error } = await supabase.rpc('assign_room', { p_max_members: maxMembers });
+  if (error) throw error;
+  if (!data) throw new Error('找不到可加入的房間');
+  return data as string;
+}
+
 export async function joinRoom(input: JoinRoomInput) {
   return supabase.from('room_sessions').upsert({
     id: input.id,
+    room_id: input.roomId,
     user_id: input.userId,
     name: input.name,
     animal: input.animal,
@@ -65,26 +75,32 @@ export async function leaveRoom(id: string, userId: string) {
   return supabase.from('room_sessions').delete().eq('id', id).eq('user_id', userId);
 }
 
-export async function fetchActiveRoomSessions(userId: string): Promise<RoomSession[]> {
+export async function fetchActiveRoomSessions(userId: string, roomId: string): Promise<RoomSession[]> {
   const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS).toISOString();
   const { data, error } = await supabase
     .from('room_sessions')
-    .select('id,user_id,name,animal,task,status,action,last_seen')
+    .select('id,room_id,user_id,name,animal,task,status,action,last_seen')
+    .eq('room_id', roomId)
     .neq('user_id', userId)
     .gt('last_seen', cutoff)
     .order('last_seen', { ascending: false })
-    .limit(20);
+    .limit(5);
 
   if (error) throw error;
   return (data ?? []) as RoomSession[];
 }
 
-export function subscribeToRoomSessions(onChange: () => void): RealtimeChannel {
+export function subscribeToRoomSessions(roomId: string, onChange: () => void): RealtimeChannel {
   return supabase
-    .channel(`room-sessions-${Date.now()}-${Math.random()}`)
+    .channel(`room-${roomId}`)
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'room_sessions' },
+      {
+        event: '*',
+        schema: 'public',
+        table: 'room_sessions',
+        filter: `room_id=eq.${roomId}`,
+      },
       onChange,
     )
     .subscribe();
