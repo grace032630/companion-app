@@ -330,7 +330,7 @@ export default function RoomScreen() {
 
         <View style={[styles.roomCard, askingHelp && styles.helpRoomCard, finished && styles.doneRoomCard]}>
           <Text style={styles.roomTitle}>{finished ? '任務完成！' : askingHelp ? '卡住了 等人來推你' : '大家一起施工'}</Text>
-          <Text style={styles.roomSubtitle}>{realHelpers.length > 0 ? `有 ${realHelpers.length} 位夥伴跟你一起施工` : '現在先由小幫手補位'}</Text>
+          {realHelpers.length > 0 && <Text style={styles.roomSubtitle}>有 {realHelpers.length} 位夥伴跟你一起施工</Text>}
           <View style={styles.mainSpot}><CrewCharacter member={me} state={myAnimationState} /></View>
           <View style={styles.helperGrid}>
             {helpers.map((member) => <CrewCharacter key={member.id} member={member} />)}
