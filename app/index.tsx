@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,10 +10,24 @@ import { supabase } from '../lib/supabase';
 const TASKS = ['打掃房間', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '其他事項'];
 
 export default function HomeScreen() {
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [task, setTask] = useState<string | null>(null);
+
+  if (profileLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#A86F4D" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile) {
+    return <Redirect href="/profile-setup" />;
+  }
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -36,10 +50,10 @@ export default function HomeScreen() {
         <View style={styles.topRow}>
           <View>
             <Text style={styles.brand}>Companion</Text>
-            {profile && <Text style={styles.nickname}>嗨 {profile.nickname}</Text>}
+            <Text style={styles.nickname}>嗨 {profile.nickname}</Text>
           </View>
           <View style={styles.avatar}>
-            {profile ? <AnimalCharacter animal={profile.animal} size="small" state="idle" /> : <Text style={styles.avatarText}>🐻</Text>}
+            <AnimalCharacter animal={profile.animal} size="small" state="idle" />
           </View>
         </View>
 
@@ -86,12 +100,12 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: '#FFF9F1', flex: 1 },
+  loadingWrap: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   scrollContent: { paddingBottom: 32, paddingHorizontal: 24, paddingTop: 20 },
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   brand: { color: '#493D34', fontSize: 24, fontWeight: '700' },
   nickname: { color: '#8A7A6E', fontSize: 13, marginTop: 4 },
   avatar: { alignItems: 'center', backgroundColor: '#F4E1CF', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  avatarText: { fontSize: 27 },
   hero: { backgroundColor: '#FFFFFF', borderColor: '#F0DED0', borderRadius: 28, borderWidth: 1, marginBottom: 28, marginTop: 28, padding: 26, shadowColor: '#795E4B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 18 },
   prompt: { color: '#493D34', fontSize: 29, fontWeight: '700', lineHeight: 40 },
   companions: { flexDirection: 'row', marginTop: 22 },
