@@ -2,14 +2,13 @@ import { Redirect, Stack, usePathname } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '../lib/auth';
-import { ProfileProvider, useProfile } from '../lib/profile';
+import { ProfileProvider } from '../lib/profile';
 
 function RootNavigator() {
-  const { session, loading: authLoading } = useAuth();
-  const { profile, loading: profileLoading } = useProfile();
+  const { session, loading } = useAuth();
   const pathname = usePathname();
 
-  if (authLoading || (session && profileLoading)) {
+  if (loading) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" />
@@ -18,17 +17,12 @@ function RootNavigator() {
   }
 
   const isLoginRoute = pathname === '/login';
-  const isProfileSetupRoute = pathname === '/profile-setup';
 
   if (!session && !isLoginRoute) {
     return <Redirect href="/login" />;
   }
 
-  if (session && !profile && !isProfileSetupRoute) {
-    return <Redirect href="/profile-setup" />;
-  }
-
-  if (session && profile && (isLoginRoute || isProfileSetupRoute)) {
+  if (session && isLoginRoute) {
     return <Redirect href="/" />;
   }
 
