@@ -5,14 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { useProfile } from '../lib/profile';
-import { supabase } from '../lib/supabase';
 
 const TASKS = ['打掃房間', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '其他事項'];
 
 export default function HomeScreen() {
   const { profile, loading: profileLoading } = useProfile();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [task, setTask] = useState<string | null>(null);
 
   if (profileLoading) {
@@ -29,16 +26,6 @@ export default function HomeScreen() {
     return <Redirect href="/profile-setup" />;
   }
 
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    setErrorMessage(null);
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      setErrorMessage(error.message);
-      setIsSigningOut(false);
-    }
-  };
-
   const handleStart = () => {
     if (!task) return;
     router.push({ pathname: '/room', params: { task } });
@@ -52,9 +39,12 @@ export default function HomeScreen() {
             <Text style={styles.brand}>Companion</Text>
             <Text style={styles.nickname}>嗨 {profile.nickname}</Text>
           </View>
-          <View style={styles.avatar}>
+          <Pressable
+            accessibilityLabel="打開我的資料"
+            onPress={() => router.push('/profile')}
+            style={({ pressed }) => [styles.avatar, pressed && styles.avatarPressed]}>
             <AnimalCharacter animal={profile.animal} size="small" state="idle" />
-          </View>
+          </Pressable>
         </View>
 
         <View style={styles.hero}>
@@ -86,13 +76,6 @@ export default function HomeScreen() {
           style={({ pressed }) => [styles.startButton, !task && styles.startButtonDisabled, pressed && task && styles.pressed]}>
           <Text style={[styles.startButtonText, !task && styles.startButtonTextDisabled]}>{task ? '一起開工' : '選一件事'}</Text>
         </Pressable>
-
-        <View style={styles.footer}>
-          {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
-          <Pressable disabled={isSigningOut} onPress={handleSignOut} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>
-            {isSigningOut ? <ActivityIndicator color="#7C5D4B" /> : <Text style={styles.signOutText}>Sign out</Text>}
-          </Pressable>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -105,7 +88,8 @@ const styles = StyleSheet.create({
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   brand: { color: '#493D34', fontSize: 24, fontWeight: '700' },
   nickname: { color: '#8A7A6E', fontSize: 13, marginTop: 4 },
-  avatar: { alignItems: 'center', backgroundColor: '#F4E1CF', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  avatar: { alignItems: 'center', backgroundColor: '#F4E1CF', borderColor: '#E7CEBA', borderRadius: 24, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
+  avatarPressed: { opacity: 0.65, transform: [{ scale: 0.96 }] },
   hero: { backgroundColor: '#FFFFFF', borderColor: '#F0DED0', borderRadius: 28, borderWidth: 1, marginBottom: 28, marginTop: 28, padding: 26, shadowColor: '#795E4B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 18 },
   prompt: { color: '#493D34', fontSize: 29, fontWeight: '700', lineHeight: 40 },
   companions: { flexDirection: 'row', marginTop: 22 },
@@ -119,9 +103,5 @@ const styles = StyleSheet.create({
   startButtonDisabled: { backgroundColor: '#E5D8CE' },
   startButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   startButtonTextDisabled: { color: '#9D8D82' },
-  footer: { marginTop: 28 },
-  signOutButton: { alignItems: 'center', borderColor: '#DCC7B6', borderRadius: 15, borderWidth: 1, height: 50, justifyContent: 'center' },
-  signOutText: { color: '#7C5D4B', fontSize: 15, fontWeight: '600' },
   pressed: { opacity: 0.72 },
-  errorText: { color: '#9B4F3B', fontSize: 13, marginBottom: 10, textAlign: 'center' },
 });
