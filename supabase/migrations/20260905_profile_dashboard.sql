@@ -33,3 +33,24 @@ create policy "users can read own task completions"
 create policy "users can insert own task completions"
   on public.task_completions for insert
   with check (auth.uid() = user_id);
+
+create or replace function public.log_room_completion()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.status = 'done' and old.status is distinct from 'done' then
+    insert into public.task_completions (user_id, task)
+    values (new.user_id, new.task);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists room_session_completion_log on public.room_sessions;
+create trigger room_session_completion_log
+after update of status on public.room_sessions
+for each row
+execute function public.log_room_completion();
