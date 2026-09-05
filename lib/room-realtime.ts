@@ -4,6 +4,7 @@ import type { ConstructionActionId, CrewMember } from '../types/crew';
 import { supabase } from './supabase';
 
 export type RoomStatus = 'working' | 'help' | 'done';
+export type SupportKind = 'push' | 'punch';
 
 export type RoomSession = {
   id: string;
@@ -14,7 +15,20 @@ export type RoomSession = {
   task: string;
   status: RoomStatus;
   action: ConstructionActionId;
+  help_request_id: string | null;
   last_seen: string;
+};
+
+export type SupportEvent = {
+  id: string;
+  room_id: string;
+  request_id: string;
+  target_user_id: string;
+  actor_user_id: string;
+  actor_name: string;
+  actor_animal: string;
+  kind: SupportKind;
+  created_at: string;
 };
 
 export type JoinRoomInput = {
@@ -47,6 +61,7 @@ export async function joinRoom(input: JoinRoomInput) {
     task: input.task,
     status: input.status,
     action: input.action,
+    help_request_id: null,
     last_seen: new Date().toISOString(),
   });
 }
@@ -54,7 +69,7 @@ export async function joinRoom(input: JoinRoomInput) {
 export async function updateRoomSession(
   id: string,
   userId: string,
-  updates: Partial<Pick<RoomSession, 'task' | 'status' | 'action'>>,
+  updates: Partial<Pick<RoomSession, 'task' | 'status' | 'action' | 'help_request_id'>>,
 ) {
   return supabase
     .from('room_sessions')
@@ -79,7 +94,7 @@ export async function fetchActiveRoomSessions(userId: string, roomId: string): P
   const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS).toISOString();
   const { data, error } = await supabase
     .from('room_sessions')
-    .select('id,room_id,user_id,name,animal,task,status,action,last_seen')
+    .select('id,room_id,user_id,name,animal,task,status,action,help_request_id,last_seen')
     .eq('room_id', roomId)
     .neq('user_id', userId)
     .gt('last_seen', cutoff)
@@ -104,6 +119,47 @@ export function subscribeToRoomSessions(roomId: string, onChange: () => void): R
       onChange,
     )
     .subscribe();
+}
+
+export function subscribeToSupportEvents(
+  roomId: string,
+  userId: string,
+  onEvent: (event: SupportEvent) => void,
+): RealtimeChannel {
+  return supabase
+    .channel(`support-${roomId}-${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'support_events',
+        filter: `target_user_id=eq.${userId}`,
+      },
+      (payload) => {
+        const event = payload.new as SupportEvent;
+        if (event.room_id === roomId) onEvent(event);
+      },
+    )
+    .subscribe();
+}
+
+export async function sendSupportEvent(input: {
+  roomId: string;
+  requestId: string;
+  targetUserId: string;
+  kind: SupportKind;
+  actorName: string;
+  actorAnimal: string;
+}) {
+  return supabase.rpc('send_support_event', {
+    p_room_id: input.roomId,
+    p_request_id: input.requestId,
+    p_target_user_id: input.targetUserId,
+    p_kind: input.kind,
+    p_actor_name: input.actorName,
+    p_actor_animal: input.actorAnimal,
+  });
 }
 
 export function roomSessionToCrewMember(session: RoomSession): CrewMember {
