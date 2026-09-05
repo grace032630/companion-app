@@ -323,14 +323,14 @@ export default function RoomScreen() {
           <Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.brand}>Companion</Text>
-            <Text style={styles.roomCode}>{roomLabel} · {Math.min(ROOM_CAPACITY, realHelpers.length + 1)}/{ROOM_CAPACITY} 真人</Text>
+            <Text style={styles.roomCode}>{roomLabel} · {Math.min(ROOM_CAPACITY, realHelpers.length + 1)}/{ROOM_CAPACITY}</Text>
           </View>
           <Pressable onPress={() => setBoardOpen(true)} style={styles.boardButton}><Text style={styles.boardButtonText}>📌</Text></Pressable>
         </View>
 
         <View style={[styles.roomCard, askingHelp && styles.helpRoomCard, finished && styles.doneRoomCard]}>
           <Text style={styles.roomTitle}>{finished ? '任務完成！' : askingHelp ? '卡住了 等人來推你' : '大家一起施工'}</Text>
-          <Text style={styles.roomSubtitle}>{realHelpers.length > 0 ? `有 ${realHelpers.length} 個真人跟你同房` : '現在先由小幫手補位'}</Text>
+          <Text style={styles.roomSubtitle}>{realHelpers.length > 0 ? `有 ${realHelpers.length} 位夥伴跟你一起施工` : '現在先由小幫手補位'}</Text>
           <View style={styles.mainSpot}><CrewCharacter member={me} state={myAnimationState} /></View>
           <View style={styles.helperGrid}>
             {helpers.map((member) => <CrewCharacter key={member.id} member={member} />)}
