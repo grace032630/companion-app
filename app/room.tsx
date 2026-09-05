@@ -16,6 +16,7 @@ import { AnimalCharacter } from '../components/AnimalCharacter';
 import { ConstructionAction } from '../components/ConstructionAction';
 import { ANIMAL_OPTIONS, CONSTRUCTION_ACTION_IDS, NAME_OPTIONS } from '../constants/crew';
 import { useAuth } from '../lib/auth';
+import { useProfile } from '../lib/profile';
 import {
   fetchActiveRoomSessions,
   heartbeatRoomSession,
@@ -106,12 +107,9 @@ function makeCrewMember(id: string, action: ConstructionActionId, isMe = false):
   };
 }
 
-function makeLocalCrew(): CrewMember[] {
-  const actions = shuffle(CONSTRUCTION_ACTION_IDS).slice(0, 4);
-
-  return actions.map((action, index) =>
-    makeCrewMember(index === 0 ? 'me' : `npc-${index}`, action, index === 0),
-  );
+function makeNpcPool(): CrewMember[] {
+  const actions = shuffle(CONSTRUCTION_ACTION_IDS).slice(0, 3);
+  return actions.map((action, index) => makeCrewMember(`npc-${index + 1}`, action));
 }
 
 function makeBoardItem(member: CrewMember, task: Task, kind: RoomStatus = 'working'): BoardItem {
@@ -169,11 +167,18 @@ function CrewCharacter({ member, state = 'working' }: CrewCharacterProps) {
 
 export default function RoomScreen() {
   const { session } = useAuth();
+  const { profile } = useProfile();
   const params = useLocalSearchParams<{ task?: string }>();
   const task: Task = isTask(params.task) ? params.task : '其他事項';
-  const [localCrew] = useState(makeLocalCrew);
-  const me = localCrew[0];
-  const npcPool = localCrew.slice(1);
+  const [myAction] = useState<ConstructionActionId>(() => pick(CONSTRUCTION_ACTION_IDS));
+  const [npcPool] = useState(makeNpcPool);
+  const me: CrewMember = {
+    id: 'me',
+    action: myAction,
+    animal: profile?.animal ?? '🐱',
+    isMe: true,
+    name: profile?.nickname ?? '你',
+  };
   const [liveSessions, setLiveSessions] = useState<RoomSession[]>([]);
   const [status, setStatus] = useState<RoomStatus>('working');
   const [boardOpen, setBoardOpen] = useState(false);
@@ -215,7 +220,7 @@ export default function RoomScreen() {
 
   useEffect(() => {
     const userId = session?.user.id;
-    if (!userId) return;
+    if (!userId || !profile) return;
 
     let active = true;
     const roomSessionId = roomSessionIdRef.current;
@@ -261,14 +266,14 @@ export default function RoomScreen() {
       void leaveRoom(roomSessionId, userId);
       void supabase.removeChannel(channel);
     };
-  }, [me.action, me.animal, me.name, session?.user.id, task]);
+  }, [me.action, me.animal, me.name, profile, session?.user.id, task]);
 
   useEffect(() => {
     const userId = session?.user.id;
-    if (!userId) return;
+    if (!userId || !profile) return;
 
     void updateRoomSession(roomSessionIdRef.current, userId, { status, task });
-  }, [session?.user.id, status, task]);
+  }, [profile, session?.user.id, status, task]);
 
   const animateSupport = (kind: SupportKind) => {
     supportScale.setValue(0.9);
@@ -389,7 +394,7 @@ export default function RoomScreen() {
         </View>
 
         <View style={styles.identityPill}>
-          <Text style={styles.identityText}>這次你是 {me.name}</Text>
+          <Text style={styles.identityText}>{me.name}</Text>
           <AnimalCharacter animal={me.animal} size="small" state={myAnimationState} />
         </View>
 

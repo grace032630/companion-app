@@ -1,15 +1,16 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 
-import { useAuth } from '../lib/auth';
+import { AnimalCharacter } from '../components/AnimalCharacter';
+import { useProfile } from '../lib/profile';
 import { supabase } from '../lib/supabase';
 
 const TASKS = ['打掃房間', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '其他事項'];
 
 export default function HomeScreen() {
-  const { session } = useAuth();
+  const { profile } = useProfile();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [task, setTask] = useState<string | null>(null);
@@ -18,7 +19,10 @@ export default function HomeScreen() {
     setIsSigningOut(true);
     setErrorMessage(null);
     const { error } = await supabase.auth.signOut();
-    if (error) { setErrorMessage(error.message); setIsSigningOut(false); }
+    if (error) {
+      setErrorMessage(error.message);
+      setIsSigningOut(false);
+    }
   };
 
   const handleStart = () => {
@@ -32,24 +36,40 @@ export default function HomeScreen() {
         <View style={styles.topRow}>
           <View>
             <Text style={styles.brand}>Companion</Text>
-            {session?.user.email && <Text style={styles.email}>{session.user.email}</Text>}
+            {profile && <Text style={styles.nickname}>嗨 {profile.nickname}</Text>}
           </View>
-          <View style={styles.avatar}><Text style={styles.avatarText}>🐻</Text></View>
+          <View style={styles.avatar}>
+            {profile ? <AnimalCharacter animal={profile.animal} size="small" state="idle" /> : <Text style={styles.avatarText}>🐻</Text>}
+          </View>
         </View>
 
         <View style={styles.hero}>
           <Text style={styles.prompt}>現在想做什麼呢？^^</Text>
-          <View style={styles.companions}><Text style={styles.companion}>🦊</Text><Text style={styles.companion}>🐰</Text><Text style={styles.companion}>🐻</Text></View>
+          <View style={styles.companions}>
+            <Text style={styles.companion}>🦊</Text>
+            <Text style={styles.companion}>🐰</Text>
+            <Text style={styles.companion}>🐻</Text>
+          </View>
         </View>
 
         <View style={styles.chipWrap}>
           {TASKS.map((item) => {
             const selected = task === item;
-            return <Pressable key={item} onPress={() => setTask(item)} style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}><Text style={[styles.chipText, selected && styles.chipTextSelected]}>{item}</Text></Pressable>;
+            return (
+              <Pressable
+                key={item}
+                onPress={() => setTask(item)}
+                style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}>
+                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{item}</Text>
+              </Pressable>
+            );
           })}
         </View>
 
-        <Pressable disabled={!task} onPress={handleStart} style={({ pressed }) => [styles.startButton, !task && styles.startButtonDisabled, pressed && task && styles.pressed]}>
+        <Pressable
+          disabled={!task}
+          onPress={handleStart}
+          style={({ pressed }) => [styles.startButton, !task && styles.startButtonDisabled, pressed && task && styles.pressed]}>
           <Text style={[styles.startButtonText, !task && styles.startButtonTextDisabled]}>{task ? '一起開工' : '選一件事'}</Text>
         </Pressable>
 
@@ -69,7 +89,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 32, paddingHorizontal: 24, paddingTop: 20 },
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   brand: { color: '#493D34', fontSize: 24, fontWeight: '700' },
-  email: { color: '#8A7A6E', fontSize: 13, marginTop: 4 },
+  nickname: { color: '#8A7A6E', fontSize: 13, marginTop: 4 },
   avatar: { alignItems: 'center', backgroundColor: '#F4E1CF', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   avatarText: { fontSize: 27 },
   hero: { backgroundColor: '#FFFFFF', borderColor: '#F0DED0', borderRadius: 28, borderWidth: 1, marginBottom: 28, marginTop: 28, padding: 26, shadowColor: '#795E4B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 18 },
