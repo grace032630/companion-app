@@ -143,7 +143,7 @@ export default function LoginScreen() {
   return (
     <ImageBackground
       source={require('../assets/backgrounds/login-bg.png')}
-      resizeMode="contain"
+      resizeMode="stretch"
       style={styles.background}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   background: { backgroundColor: '#F7E6D2', flex: 1, width: '100%' },
   safeArea: { backgroundColor: 'transparent', flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 20 },
-  content: { alignSelf: 'center', flex: 1, justifyContent: 'flex-end', maxWidth: 430, minHeight: 760, paddingBottom: 18, paddingTop: 390, width: '100%' },
+  content: { alignSelf: 'center', flex: 1, justifyContent: 'flex-end', maxWidth: 430, minHeight: '100%', paddingBottom: 18, paddingTop: 390, width: '100%' },
   introCopy: { alignItems: 'center', backgroundColor: 'rgba(255,249,241,0.82)', borderRadius: 18, marginBottom: 18, paddingHorizontal: 14, paddingVertical: 12 },
   tagline: { color: '#5D5148', fontSize: 18, fontWeight: '700', lineHeight: 28, textAlign: 'center' },
   description: { color: '#7E6F64', fontSize: 14, lineHeight: 22, marginTop: 6, textAlign: 'center' },
