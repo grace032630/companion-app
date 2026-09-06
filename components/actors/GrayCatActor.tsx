@@ -25,13 +25,12 @@ const EYES_OPEN = require('../../assets/characters/gray-cat/eyes_open.png');
 export const GRAY_CAT_BASE_SIZE = 160;
 
 export const GRAY_CAT_BASE_POSE: Record<PartName, PartPlacement> = {
-  tail: { left: 4, top: 68, width: 78, height: 78 },
-  body: { left: 30, top: 55, width: 100, height: 105 },
-  // The paw PNGs are long forearms. Keep the paw tips around chest height,
-  // otherwise they read like extra legs at small sizes.
-  pawLeft: { left: 29, top: 58, width: 56, height: 56 },
-  pawRight: { left: 75, top: 58, width: 56, height: 56 },
-  head: { left: 27, top: 5, width: 106, height: 106 },
+  tail: { left: 6, top: 70, width: 76, height: 76 },
+  body: { left: 30, top: 56, width: 100, height: 104 },
+  // Forearms should visibly connect from the gray shoulder area and extend outward.
+  pawLeft: { left: 12, top: 42, width: 82, height: 82 },
+  pawRight: { left: 66, top: 42, width: 82, height: 82 },
+  head: { left: 27, top: 6, width: 106, height: 106 },
 };
 
 const DEBUG_COLORS: Record<PartName, string> = {
@@ -115,8 +114,8 @@ export function GrayCatActor({
 
   // The left/right paw files both face the same way. Mirror only the left one
   // so both paw tips point inward toward the cat's chest.
-  const leftPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['3deg', '13deg'] });
-  const rightPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '-13deg'] });
+  const leftPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['8deg', '18deg'] });
+  const rightPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '-18deg'] });
 
   return (
     <View accessibilityLabel={`灰白貓，${state}`} style={[styles.canvas, { height: size, width: size }]}>
@@ -187,21 +186,22 @@ const styles = StyleSheet.create({
   // eyes_open.png was generated on a full 1254x1254 canvas. If stretched to
   // the whole head the eyes become huge. Shrink the whole overlay and center it.
   openEyes: {
-    height: '58%',
-    left: '21%',
+    height: '32%',
+    left: '16%',
     position: 'absolute',
-    top: '20%',
-    width: '58%',
+    top: '26%',
+    transform: [{ scaleX: 1.26 }],
+    width: '68%',
   },
   // eyes_closed.png uses a small 160x160 calibration canvas. It needs to sit
   // lower on the face than before.
   closedEyes: {
-    height: '100%',
-    left: 0,
+    height: '30%',
+    left: '13%',
     position: 'absolute',
-    top: '12%',
-    transform: [{ scaleX: 1.22 }],
-    width: '100%',
+    top: '27%',
+    transform: [{ scaleX: 1.32 }],
+    width: '74%',
   },
 
   quoteBubble: {
