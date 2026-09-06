@@ -27,10 +27,10 @@ export const GRAY_CAT_BASE_SIZE = 160;
 
 export const GRAY_CAT_BASE_POSE: Record<PartName, PartPlacement> = {
   tail: { left: 6, top: 70, width: 76, height: 76 },
-  body: { left: 30, top: 56, width: 100, height: 104 },
+  body: { left: 30, top: 70, width: 100, height: 104 },
   // Forearms should visibly connect from the gray shoulder area and extend outward.
-  pawLeft: { left: 12, top: 42, width: 82, height: 82 },
-  pawRight: { left: 66, top: 42, width: 82, height: 82 },
+  pawLeft: { left: -10, top: 30, width: 82, height: 82 },
+  pawRight: { left: 80, top: 42, width: 82, height: 82 },
   head: { left: 27, top: 6, width: 106, height: 106 },
 };
 
@@ -139,7 +139,7 @@ export function GrayCatActor({
           styles.part,
           scaledPlacement('pawLeft', scale),
           debugStyle('pawLeft', showDebug),
-          { transform: [{ scaleX: -1 }, { rotate: leftPawRotate }] },
+          { transform: [{ scaleX: 1 }, { rotate: leftPawRotate }] },
         ]}
       >
         <Image resizeMode="contain" source={PAW_LEFT} style={styles.image} />
@@ -150,7 +150,7 @@ export function GrayCatActor({
           styles.part,
           scaledPlacement('pawRight', scale),
           debugStyle('pawRight', showDebug),
-          { transform: [{ rotate: rightPawRotate }] },
+          { transform: [{ scaleX: -1 }, { rotate: rightPawRotate }] },          
         ]}
       >
         <Image resizeMode="contain" source={PAW_RIGHT} style={styles.image} />
@@ -196,16 +196,16 @@ const styles = StyleSheet.create({
   // stretching the eyeballs themselves.
   openEyeLeft: {
     height: '24%',
-    left: '21%',
+    left: '19%',
     position: 'absolute',
-    top: '30%',
+    top: '40%',
     width: '24%',
   },
   openEyeRight: {
     height: '24%',
     position: 'absolute',
-    right: '21%',
-    top: '30%',
+    right: '19%',
+    top: '40%',
     width: '24%',
   },
   // eyes_closed.png uses a small 160x160 calibration canvas. It needs to sit
@@ -214,8 +214,8 @@ const styles = StyleSheet.create({
     height: '50%',
     left: '13%',
     position: 'absolute',
-    top: '50%',
-    transform: [{ scaleX: 2.32 }],
+    top: '30%',
+    transform: [{ scaleX: 3.32 }],
     width: '74%',
   },
 
