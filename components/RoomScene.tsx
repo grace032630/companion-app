@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, ImageBackground, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Animated, ImageBackground, PanResponder, StyleSheet, Text, View } from 'react-native';
 
 import type { AnimalAnimationState, CrewMember } from '../types/crew';
 import { AnimalCharacter } from './AnimalCharacter';
 import { ConstructionAction } from './ConstructionAction';
 
 const ROOM_DAY_BACKGROUND = require('../assets/backgrounds/room-day.png');
-const ROOM_DAY_BACKGROUND_META = Image.resolveAssetSource(ROOM_DAY_BACKGROUND);
-const ROOM_DAY_ASPECT_RATIO =
-  ROOM_DAY_BACKGROUND_META.width && ROOM_DAY_BACKGROUND_META.height
-    ? ROOM_DAY_BACKGROUND_META.width / ROOM_DAY_BACKGROUND_META.height
-    : 9 / 16;
+const ROOM_DAY_ASPECT_RATIO = 9 / 16;
 
 type RoomSceneProps = {
   me: CrewMember;
@@ -167,7 +163,6 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
     <ImageBackground
       source={ROOM_DAY_BACKGROUND}
       resizeMode="cover"
-      imageStyle={styles.sceneBackgroundImage}
       style={[
         styles.scene,
         { aspectRatio: ROOM_DAY_ASPECT_RATIO },
@@ -200,9 +195,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     width: '100%',
-  },
-  sceneBackgroundImage: {
-    transform: [{ scale: 1.03 }],
   },
   sceneShade: { backgroundColor: 'rgba(53,35,23,0.04)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   sceneHelp: { borderColor: '#E19B78', borderWidth: 2 },
