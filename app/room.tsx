@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useAudioPlayer } from 'expo-audio';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -65,6 +66,8 @@ export default function RoomScreen(){
   const [supportKind,setSupportKind]=useState<SupportKind|null>(null);
   const [impactState,setImpactState]=useState<'pushed'|'punched'|null>(null);
   const [supportScale]=useState(()=>new Animated.Value(0.92));
+  const [bgmEnabled,setBgmEnabled]=useState(true);
+  const bgmPlayer=useAudioPlayer(require('../assets/audio/room-bgm.mp3'));
   const timersRef=useRef<ReturnType<typeof setTimeout>[]>([]);
   const roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);
 
@@ -79,6 +82,15 @@ export default function RoomScreen(){
   const board=[makeBoardItem(me,task,status),...liveSessions.slice(0,ROOM_CAPACITY-1).map(makeSessionBoardItem),...npcHelpers.map((member,index)=>makeBoardItem(member,npcTasks[index]??'其他事項'))].slice(0,ROOM_CAPACITY);
 
   const clearTimers=()=>{timersRef.current.forEach(clearTimeout);timersRef.current=[];};
+
+  useEffect(()=>{
+    bgmPlayer.loop=true;
+    bgmPlayer.volume=0.22;
+    if(bgmEnabled) bgmPlayer.play();
+    else bgmPlayer.pause();
+    return()=>{bgmPlayer.pause();};
+  },[bgmEnabled,bgmPlayer]);
+
   const animateSupport=(kind:SupportKind)=>{supportScale.setValue(0.9);setImpactState(kind==='push'?'pushed':'punched');Vibration.vibrate(kind==='push'?90:[0,70,100,70]);Animated.spring(supportScale,{bounciness:18,speed:23,toValue:1,useNativeDriver:true}).start();timersRef.current.push(setTimeout(()=>setImpactState(null),900));};
   useEffect(()=>()=>clearTimers(),[]);
 
@@ -108,7 +120,7 @@ export default function RoomScreen(){
 
   return <SafeAreaView style={styles.safeArea}>
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><Pressable onPress={()=>setLeaveOpen(true)} style={styles.headerButton}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCenter}><Text style={styles.brand}>Companion</Text><Text style={styles.roomCode}>{roomLabel} · {helpers.length+1}/{ROOM_CAPACITY}</Text></View><Pressable onPress={()=>setBoardOpen(true)} style={styles.headerButton}><Text style={styles.boardIcon}>📌</Text></Pressable></View>
+      <View style={styles.header}><Pressable onPress={()=>setLeaveOpen(true)} style={styles.headerButton}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCenter}><Text style={styles.brand}>Companion</Text><Text style={styles.roomCode}>{roomLabel} · {helpers.length+1}/{ROOM_CAPACITY}</Text></View><View style={styles.headerActions}><Pressable onPress={()=>setBgmEnabled((value)=>!value)} style={styles.headerButton}><Text style={styles.soundIcon}>{bgmEnabled?'🔊':'🔇'}</Text></Pressable><Pressable onPress={()=>setBoardOpen(true)} style={styles.headerButton}><Text style={styles.boardIcon}>📌</Text></Pressable></View></View>
 
       <RoomScene me={me} helpers={helpers} myState={myAnimationState} task={task} quote={profile?.quote} askingHelp={askingHelp} finished={finished}/>
 
@@ -129,7 +141,7 @@ export default function RoomScreen(){
 
 const styles=StyleSheet.create({
   safeArea:{backgroundColor:'#F5E8DB',flex:1},content:{paddingBottom:34,paddingHorizontal:14,paddingTop:10},loadingWrap:{alignItems:'center',flex:1,gap:14,justifyContent:'center',padding:30},loadingText:{color:'#765C4D',fontSize:15,fontWeight:'700'},errorText:{color:'#A04F3B',fontSize:14,textAlign:'center'},
-  header:{alignItems:'center',flexDirection:'row',justifyContent:'space-between',paddingHorizontal:4},headerCenter:{alignItems:'center'},headerButton:{alignItems:'center',height:42,justifyContent:'center',width:42},backText:{color:'#5B493F',fontSize:36,lineHeight:38},brand:{color:'#493D34',fontSize:20,fontWeight:'900'},roomCode:{color:'#8E7567',fontSize:10,marginTop:2},boardIcon:{fontSize:20},
+  header:{alignItems:'center',flexDirection:'row',justifyContent:'space-between',paddingHorizontal:4},headerCenter:{alignItems:'center'},headerActions:{alignItems:'center',flexDirection:'row'},headerButton:{alignItems:'center',height:42,justifyContent:'center',width:42},backText:{color:'#5B493F',fontSize:36,lineHeight:38},brand:{color:'#493D34',fontSize:20,fontWeight:'900'},roomCode:{color:'#8E7567',fontSize:10,marginTop:2},soundIcon:{fontSize:18},boardIcon:{fontSize:20},
   helpAlert:{backgroundColor:'#FFF0E8',borderColor:'#E3B99E',borderRadius:20,borderWidth:1,marginTop:12,padding:14},helpAlertCopy:{alignItems:'center',flexDirection:'row',gap:10},helpAlertTextWrap:{flex:1},helpAlertTitle:{color:'#744A34',fontSize:15,fontWeight:'900'},helpAlertText:{color:'#98705A',fontSize:12,marginTop:3},helpAlertActions:{flexDirection:'row',gap:8,marginTop:12},pushButton:{alignItems:'center',backgroundColor:'#FFFFFF',borderColor:'#D8B79F',borderRadius:13,borderWidth:1,flex:1,paddingVertical:10},pushButtonText:{color:'#744F39',fontSize:12,fontWeight:'800'},punchButton:{alignItems:'center',backgroundColor:'#FFD9CC',borderColor:'#D9957D',borderRadius:13,borderWidth:1,flex:1,paddingVertical:10},punchButtonText:{color:'#7A4333',fontSize:12,fontWeight:'900'},
   supportBubble:{alignItems:'center',backgroundColor:'rgba(255,255,255,0.92)',borderColor:'#EDDED2',borderRadius:20,borderWidth:1,flexDirection:'row',gap:9,marginTop:12,padding:13},supportMessage:{color:'#5F4A3E',flex:1,fontSize:14,fontWeight:'700',lineHeight:20},supportCard:{backgroundColor:'#FFE3B8',borderColor:'#D6944D',borderRadius:18,borderWidth:2,marginTop:10,padding:14},punchCard:{backgroundColor:'#FFD8CB',borderColor:'#C96B54'},supportText:{color:'#5D3A20',fontSize:16,fontWeight:'900',textAlign:'center'},notice:{alignItems:'center',backgroundColor:'#F2D9C4',borderRadius:14,marginTop:10,padding:10},noticeText:{color:'#6E432C',fontSize:12,fontWeight:'700',textAlign:'center'},
   actionsWrap:{flexDirection:'row',gap:10,marginTop:14},helpButton:{alignItems:'center',backgroundColor:'#FFFDFC',borderColor:'#D8C1B0',borderRadius:17,borderWidth:1,flex:1,justifyContent:'center',minHeight:56},helpText:{color:'#765C4D',fontSize:15,fontWeight:'900'},resumeButton:{alignItems:'center',backgroundColor:'#E7F1DF',borderColor:'#A7BF96',borderRadius:17,borderWidth:1,flex:1,justifyContent:'center',minHeight:56},resumeText:{color:'#506445',fontSize:15,fontWeight:'900'},doneButton:{alignItems:'center',alignSelf:'stretch',backgroundColor:'#A86F4D',borderRadius:17,flex:1.25,justifyContent:'center',minHeight:56,paddingHorizontal:18},doneText:{color:'#FFFFFF',fontSize:15,fontWeight:'900'},exitHint:{color:'#7C6A5E',fontSize:13,fontWeight:'700',marginTop:18,textAlign:'center'},
