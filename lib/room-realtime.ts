@@ -170,5 +170,6 @@ export function roomSessionToCrewMember(session: RoomSession): CrewMember {
     action: session.action,
     isMe: false,
     isNpc: false,
+    userId: session.user_id,
   };
 }
