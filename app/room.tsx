@@ -44,6 +44,13 @@ const SUPPORT_MESSAGES=[
   '你滑掉的是時間，消耗的是你的人生',
 ];
 const ROOM_CAPACITY=6, HEARTBEAT_MS=20_000, COMPLETE_EXIT_MS=3500, ROOM_MAX_DURATION_MS=24*60*60*1000, COMPLETION_NOTICE_MS=3000, COLLISION_MS=2200;
+const ROOM_BGM_TRACKS = [
+ require('../assets/audio/room-bgm.mp3'),
+ require('../assets/audio/room-bgm-2.mp3'),
+ require('../assets/audio/room-bgm-3.mp3'),
+ require('../assets/audio/room-bgm-4.mp3'),
+ require('../assets/audio/room-bgm-5.mp3'),
+] as const;
 type Task=(typeof TASKS)[number];
 type BoardItem={id:string;animal:string;name:string;text:string;kind:RoomStatus;helper:boolean;targetUserId?:string;requestId?:string|null};
 function pick<T>(items:readonly T[]):T{return items[Math.floor(Math.random()*items.length)];}
@@ -59,7 +66,7 @@ export default function RoomScreen(){
  const {session}=useAuth();const {profile}=useProfile();const params=useLocalSearchParams<{task?:string}>();const initialTask:Task=isTask(params.task)?params.task:'其他事項';
  const [task,setTask]=useState<Task>(initialTask),[myAction,setMyAction]=useState<ConstructionActionId>(()=>pick(CONSTRUCTION_ACTION_IDS));const [npcPool]=useState(makeNpcPool);const [npcTasks]=useState<Task[]>(()=>shuffle(TASKS).slice(0,ROOM_CAPACITY-1));
  const [roomId,setRoomId]=useState<string|null>(null),[roomError,setRoomError]=useState<string|null>(null),[liveSessions,setLiveSessions]=useState<RoomSession[]>([]),[status,setStatus]=useState<RoomStatus>('working'),[helpRequestId,setHelpRequestId]=useState<string|null>(null),[boardOpen,setBoardOpen]=useState(false),[leaveOpen,setLeaveOpen]=useState(false),[strawberryOpen,setStrawberryOpen]=useState(false),[supportIndex,setSupportIndex]=useState(()=>Math.floor(Math.random()*SUPPORT_MESSAGES.length)),[notice,setNotice]=useState<string|null>(null),[completionNotice,setCompletionNotice]=useState<string|null>(null),[completionQueue,setCompletionQueue]=useState<string[]>([]),[supportText,setSupportText]=useState<string|null>(null),[supportKind,setSupportKind]=useState<SupportKind|null>(null),[impactState,setImpactState]=useState<'pushed'|'punched'|null>(null),[collision,setCollision]=useState<RoomCollision|null>(null),[collisionQueue,setCollisionQueue]=useState<RoomCollision[]>([]),[supportScale]=useState(()=>new Animated.Value(0.92)),[bgmEnabled,setBgmEnabled]=useState(true),[elapsedSeconds,setElapsedSeconds]=useState(0);
- const roomEnteredAtRef=useRef(Date.now()),autoExitTriggeredRef=useRef(false),completionLoggedRef=useRef(false),isResumingRef=useRef(false),timersRef=useRef<ReturnType<typeof setTimeout>[]>([]),roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);const bgmPlayer=useAudioPlayer(require('../assets/audio/room-bgm.mp3'));
+ const roomEnteredAtRef=useRef(Date.now()),autoExitTriggeredRef=useRef(false),completionLoggedRef=useRef(false),isResumingRef=useRef(false),timersRef=useRef<ReturnType<typeof setTimeout>[]>([]),roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);const [roomBgmSource]=useState(()=>pick(ROOM_BGM_TRACKS));const bgmPlayer=useAudioPlayer(roomBgmSource);
  const me=useMemo<CrewMember>(()=>({id:'me',action:myAction,animal:profile?.animal??'🐱',isMe:true,name:profile?.nickname??'你',userId:session?.user.id}),[myAction,profile?.animal,profile?.nickname,session?.user.id]);
  const realHelpers=liveSessions.slice(0,5).map(roomSessionToCrewMember),npcHelpers=npcPool.slice(0,Math.max(0,5-realHelpers.length)),helpers=[...realHelpers,...npcHelpers],askingHelp=status==='help',finished=status==='done',myAnimationState:AnimalAnimationState=finished?'done':impactState??(askingHelp?'idle':'working'),helpRequests=liveSessions.filter((item)=>item.status==='help'&&item.help_request_id),board=[makeBoardItem(me,task,status),...liveSessions.slice(0,5).map(makeSessionBoardItem),...npcHelpers.map((member,index)=>makeBoardItem(member,npcTasks[index]??'其他事項'))].slice(0,6);
  const clearTimers=()=>{timersRef.current.forEach(clearTimeout);timersRef.current=[];};
