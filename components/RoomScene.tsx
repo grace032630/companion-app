@@ -328,7 +328,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
       <View style={styles.sceneShade} />
       <View pointerEvents="none" style={styles.roomTimerPill}><Text style={styles.roomTimerText}>{elapsedTime}</Text></View>
       <View style={styles.sceneTitlePill}>
-        <Text style={styles.sceneTitle}>{finished ? '施工完成 ✨' : askingHelp ? '先卡一下 會有人來' : '大家正在施工'}</Text>
+        <Text style={styles.sceneTitle}>{finished ? '施工完成 ✨' : askingHelp ? '先等等～有人來幫你！' : '大家正在施工'}</Text>
         <Text style={styles.sceneTask}>{task}</Text>
       </View>
 
