@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -140,41 +141,22 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
+    <ImageBackground
+      source={require('../assets/backgrounds/login-bg.png')}
+      resizeMode="cover"
+      style={styles.background}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
+            <View style={styles.introCopy}>
+              <Text style={styles.tagline}>「一個人不想開始，就一起開工吧」</Text>
+              <Text style={styles.description}>找一隻小夥伴陪你，把「等一下」變成「現在開始」。</Text>
+            </View>
 
-        <View style={styles.content}>
-          <View style={styles.illustration} accessibilityElementsHidden>
-            <View style={[styles.animalBubble, styles.foxBubble]}>
-              <Text style={styles.animal}>🦊</Text>
-            </View>
-            <View style={[styles.animalBubble, styles.bearBubble]}>
-              <Text style={styles.animalLarge}>🐻</Text>
-            </View>
-            <View style={[styles.animalBubble, styles.rabbitBubble]}>
-              <Text style={styles.animal}>🐰</Text>
-            </View>
-            <View style={styles.table} />
-            <View style={styles.pencil} />
-            <View style={styles.notebook}>
-              <View style={styles.notebookLine} />
-              <View style={[styles.notebookLine, styles.notebookLineShort]} />
-            </View>
-          </View>
-
-          <View style={styles.headingBlock}>
-            <Text style={styles.eyebrow}>YOUR GENTLE STARTING BUDDY</Text>
-            <Text style={styles.title}>Companion</Text>
-            <Text style={styles.tagline}>「一個人不想開始，就一起開工吧」</Text>
-            <Text style={styles.description}>找一隻小夥伴陪你，把「等一下」變成「現在開始」。</Text>
-          </View>
-
-          <View style={styles.authCard}>
+            <View style={styles.authCard}>
             <Pressable
               accessibilityRole="button"
               disabled={isLoading}
@@ -259,39 +241,25 @@ export default function LoginScreen() {
             )}
 
             <Text style={styles.terms}>登入即表示你同意以溫柔的步調，陪自己開始。</Text>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#FFF9F1', flex: 1 },
-  scrollContent: { flexGrow: 1, overflow: 'hidden', paddingHorizontal: 24, paddingVertical: 20 },
-  glowTop: { backgroundColor: '#F9DDC5', borderRadius: 150, height: 260, opacity: 0.46, position: 'absolute', right: -100, top: -100, width: 260 },
-  glowBottom: { backgroundColor: '#DCE8D4', borderRadius: 120, bottom: -90, height: 220, left: -100, opacity: 0.52, position: 'absolute', width: 220 },
-  content: { alignSelf: 'center', flex: 1, justifyContent: 'center', maxWidth: 430, paddingVertical: 16, width: '100%' },
-  illustration: { alignSelf: 'center', height: 190, marginBottom: 24, position: 'relative', width: 292 },
-  animalBubble: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#F2DDCB', borderRadius: 42, borderWidth: 2, justifyContent: 'center', position: 'absolute', shadowColor: '#9C7961', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 12 },
-  foxBubble: { height: 68, left: 6, top: 44, transform: [{ rotate: '-7deg' }], width: 68 },
-  bearBubble: { height: 94, left: 99, top: 4, width: 94 },
-  rabbitBubble: { height: 68, right: 7, top: 48, transform: [{ rotate: '7deg' }], width: 68 },
-  animal: { fontSize: 38 },
-  animalLarge: { fontSize: 52 },
-  table: { backgroundColor: '#E6C5A8', borderRadius: 16, bottom: 12, height: 18, left: 16, position: 'absolute', right: 16 },
-  pencil: { backgroundColor: '#E99068', borderRadius: 4, bottom: 33, height: 8, position: 'absolute', right: 62, transform: [{ rotate: '-18deg' }], width: 58 },
-  notebook: { backgroundColor: '#FFFDF8', borderColor: '#D8B99D', borderRadius: 7, borderWidth: 2, bottom: 27, height: 48, left: 73, padding: 10, position: 'absolute', transform: [{ rotate: '5deg' }], width: 78 },
-  notebookLine: { backgroundColor: '#DCE8D4', borderRadius: 2, height: 4, marginBottom: 7, width: 48 },
-  notebookLineShort: { width: 32 },
-  headingBlock: { alignItems: 'center', marginBottom: 30 },
-  eyebrow: { color: '#A36E50', fontSize: 11, fontWeight: '700', letterSpacing: 1.7, marginBottom: 10 },
-  title: { color: '#493D34', fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }), fontSize: 45, fontWeight: '700', letterSpacing: -1 },
-  tagline: { color: '#5D5148', fontSize: 18, fontWeight: '600', lineHeight: 28, marginTop: 13, textAlign: 'center' },
-  description: { color: '#8A7A6E', fontSize: 14, lineHeight: 22, marginTop: 8, textAlign: 'center' },
+  background: { flex: 1, width: '100%' },
+  safeArea: { backgroundColor: 'transparent', flex: 1 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 20 },
+  content: { alignSelf: 'center', flex: 1, justifyContent: 'flex-end', maxWidth: 430, minHeight: 760, paddingBottom: 18, paddingTop: 390, width: '100%' },
+  introCopy: { alignItems: 'center', backgroundColor: 'rgba(255,249,241,0.82)', borderRadius: 18, marginBottom: 18, paddingHorizontal: 14, paddingVertical: 12 },
+  tagline: { color: '#5D5148', fontSize: 18, fontWeight: '700', lineHeight: 28, textAlign: 'center' },
+  description: { color: '#7E6F64', fontSize: 14, lineHeight: 22, marginTop: 6, textAlign: 'center' },
   authCard: { gap: 13 },
   authButton: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', height: 56, justifyContent: 'center', paddingHorizontal: 18 },
-  googleButton: { backgroundColor: '#FFFFFF', borderColor: '#E8DACE', borderWidth: 1, shadowColor: '#705746', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 9 },
+  googleButton: { backgroundColor: 'rgba(255,255,255,0.96)', borderColor: '#E8DACE', borderWidth: 1, shadowColor: '#705746', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 9 },
   googleIcon: { alignItems: 'center', borderColor: '#E5DED8', borderRadius: 10, borderWidth: 1, height: 28, justifyContent: 'center', left: 18, position: 'absolute', width: 28 },
   googleIconText: { color: '#4285F4', fontSize: 17, fontWeight: '800' },
   googleButtonText: { color: '#493D34', fontSize: 16, fontWeight: '600' },
@@ -307,7 +275,7 @@ const styles = StyleSheet.create({
   appleButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   buttonPressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
   buttonDisabled: { opacity: 0.62 },
-  errorBox: { backgroundColor: '#FFF0EC', borderColor: '#F2C9BC', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11 },
+  errorBox: { backgroundColor: 'rgba(255,240,236,0.96)', borderColor: '#F2C9BC', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11 },
   errorText: { color: '#9B4F3B', fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  terms: { color: '#A5968A', fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center' },
+  terms: { backgroundColor: 'rgba(255,249,241,0.74)', borderRadius: 10, color: '#8A7A6E', fontSize: 12, lineHeight: 18, marginTop: 4, paddingHorizontal: 8, paddingVertical: 5, textAlign: 'center' },
 });
