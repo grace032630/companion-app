@@ -39,7 +39,12 @@ export default function HomeScreen() {
     >
       <View style={styles.backgroundTint} />
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          contentInsetAdjustmentBehavior="never"
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollView}
+        >
           <View style={styles.topRow}>
           <View>
             <Text style={styles.brand}>Companion</Text>
@@ -89,7 +94,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
+  background: { flex: 1, height: '100%', width: '100%' },
   backgroundTint: {
     backgroundColor: 'rgba(255,248,239,0.80)',
     bottom: 0,
@@ -98,9 +103,10 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  safeArea: { backgroundColor: 'transparent', flex: 1 },
+  safeArea: { backgroundColor: 'transparent', flex: 1, minHeight: 0 },
   loadingWrap: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  scrollContent: { paddingBottom: 32, paddingHorizontal: 24, paddingTop: 20 },
+  scrollView: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 20 },
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   brand: { color: '#493D34', fontSize: 24, fontWeight: '700' },
   nickname: { color: '#8A7A6E', fontSize: 13, marginTop: 4 },
