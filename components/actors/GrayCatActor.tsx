@@ -27,8 +27,10 @@ export const GRAY_CAT_BASE_SIZE = 160;
 export const GRAY_CAT_BASE_POSE: Record<PartName, PartPlacement> = {
   tail: { left: 4, top: 68, width: 78, height: 78 },
   body: { left: 30, top: 55, width: 100, height: 105 },
-  pawLeft: { left: 25, top: 82, width: 61, height: 61 },
-  pawRight: { left: 76, top: 80, width: 61, height: 61 },
+  // The paw PNGs are long forearms. Keep the paw tips around chest height,
+  // otherwise they read like extra legs at small sizes.
+  pawLeft: { left: 29, top: 58, width: 56, height: 56 },
+  pawRight: { left: 75, top: 58, width: 56, height: 56 },
   head: { left: 27, top: 5, width: 106, height: 106 },
 };
 
@@ -95,8 +97,8 @@ export function GrayCatActor({
       loops.push(
         Animated.loop(
           Animated.sequence([
-            Animated.timing(pawMotion, { duration: 260, toValue: 1, useNativeDriver: true }),
-            Animated.timing(pawMotion, { duration: 260, toValue: 0, useNativeDriver: true }),
+            Animated.timing(pawMotion, { duration: 280, toValue: 1, useNativeDriver: true }),
+            Animated.timing(pawMotion, { duration: 280, toValue: 0, useNativeDriver: true }),
           ]),
         ),
       );
@@ -110,9 +112,11 @@ export function GrayCatActor({
   const bodyY = floatMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -2.5 * scale] });
   const headY = floatMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -2 * scale] });
   const tailRotate = tailMotion.interpolate({ inputRange: [0, 1], outputRange: ['-6deg', '7deg'] });
-  const leftPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['-16deg', '8deg'] });
-  const rightPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['13deg', '-10deg'] });
-  const eyeSource = state === 'help' ? EYES_OPEN : EYES_CLOSED;
+
+  // The left/right paw files both face the same way. Mirror only the left one
+  // so both paw tips point inward toward the cat's chest.
+  const leftPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['3deg', '13deg'] });
+  const rightPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '-13deg'] });
 
   return (
     <View accessibilityLabel={`灰白貓，${state}`} style={[styles.canvas, { height: size, width: size }]}>
@@ -154,7 +158,22 @@ export function GrayCatActor({
 
       <Animated.View style={[styles.part, scaledPlacement('head', scale), debugStyle('head', showDebug), { transform: [{ translateY: headY }] }]}>
         <Image resizeMode="contain" source={HEAD} style={styles.image} />
-        <Image pointerEvents="none" resizeMode="contain" source={eyeSource} style={styles.eyeOverlay} />
+
+        {state === 'help' ? (
+          <Image
+            pointerEvents="none"
+            resizeMode="contain"
+            source={EYES_OPEN}
+            style={styles.openEyes}
+          />
+        ) : (
+          <Image
+            pointerEvents="none"
+            resizeMode="contain"
+            source={EYES_CLOSED}
+            style={styles.closedEyes}
+          />
+        )}
       </Animated.View>
     </View>
   );
@@ -164,7 +183,27 @@ const styles = StyleSheet.create({
   canvas: { position: 'relative' },
   part: { position: 'absolute' },
   image: { height: '100%', width: '100%' },
-  eyeOverlay: { height: '100%', left: 0, position: 'absolute', top: 0, width: '100%' },
+
+  // eyes_open.png was generated on a full 1254x1254 canvas. If stretched to
+  // the whole head the eyes become huge. Shrink the whole overlay and center it.
+  openEyes: {
+    height: '58%',
+    left: '21%',
+    position: 'absolute',
+    top: '20%',
+    width: '58%',
+  },
+  // eyes_closed.png uses a small 160x160 calibration canvas. It needs to sit
+  // lower on the face than before.
+  closedEyes: {
+    height: '100%',
+    left: 0,
+    position: 'absolute',
+    top: '12%',
+    transform: [{ scaleX: 1.22 }],
+    width: '100%',
+  },
+
   quoteBubble: {
     backgroundColor: '#FFFFFF',
     borderColor: '#E9D8CB',
