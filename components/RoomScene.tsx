@@ -40,11 +40,13 @@ function Worker({
   state = 'working',
   spot,
   delay = 0,
+  forceHelp = false,
 }: {
   member: CrewMember;
   state?: AnimalAnimationState;
   spot: { left: `${number}%`; top: number };
   delay?: number;
+  forceHelp?: boolean;
 }) {
   const [walk] = useState(() => new Animated.Value(0));
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -135,7 +137,7 @@ function Worker({
     >
       <View style={styles.workerBubbleRow}>
         {isGrayCat(member.animal)
-          ? <GrayCatActor showDebug={SHOW_GRAY_CAT_DEBUG} size={member.isMe ? 78 : 58} state={grayCatState(state)} />
+          ? <GrayCatActor showDebug={SHOW_GRAY_CAT_DEBUG} size={member.isMe ? 78 : 58} state={forceHelp ? 'help' : grayCatState(state)} />
           : <AnimalCharacter animal={member.animal} size={member.isMe ? 'large' : 'regular'} state={state} />}
         {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
       </View>
@@ -215,7 +217,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         <Text style={styles.sceneTask}>{task}</Text>
       </View>
 
-      <Worker member={me} state={myState} spot={{ left: '40%', top: 205 }} delay={120} />
+      <Worker member={me} state={myState} spot={{ left: '40%', top: 205 }} delay={120} forceHelp={askingHelp} />
       {helpers.slice(0, 5).map((member, index) => (
         <Worker key={member.id} member={member} spot={SPOTS[index]} delay={index * 170 + 80} />
       ))}
