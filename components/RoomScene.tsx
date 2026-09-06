@@ -26,6 +26,10 @@ type RoomSceneProps = {
   collision?: RoomCollision | null;
 };
 
+type RoomSpot = { left: `${number}%`; top: number };
+
+const ME_SPOT: RoomSpot = { left: '30%', top: 275 };
+
 const SPOTS = [
   { left: '-2%', top: 215 },
   { left: '63%', top: 215 },
@@ -33,6 +37,10 @@ const SPOTS = [
   { left: '57%', top: 355 },
   { left: '31%', top: 430 },
 ] as const;
+
+function percentToNumber(value: `${number}%`) {
+  return Number(value.replace('%', '')) / 100;
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -47,6 +55,7 @@ function Worker({
   quote,
   controlsLocked = false,
   hidden = false,
+  onDragPositionChange,
 }: {
   member: CrewMember;
   state?: AnimalAnimationState;
@@ -56,6 +65,7 @@ function Worker({
   quote?: string | null;
   controlsLocked?: boolean;
   hidden?: boolean;
+  onDragPositionChange?: (position: { x: number; y: number }) => void;
 }) {
   const [walk] = useState(() => new Animated.Value(0));
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -108,6 +118,7 @@ function Worker({
         const x = clamp(dragStart.current.x + gesture.dx, -145, 95);
         const y = clamp(dragStart.current.y + gesture.dy, -25, 205);
         dragCurrent.current = { x, y };
+        onDragPositionChange?.({ x, y });
         Animated.spring(drag, {
           toValue: { x, y },
           bounciness: 5,
@@ -124,7 +135,7 @@ function Worker({
         }).start();
       },
     }),
-    [controlsLocked, drag, member.isMe],
+    [controlsLocked, drag, member.isMe, onDragPositionChange],
   );
 
   const driftX = walk.interpolate({ inputRange: [0, 1], outputRange: [-5, 6] });
@@ -171,28 +182,57 @@ function Worker({
   );
 }
 
-function CollisionAnimation({ collision }: { collision: RoomCollision }) {
-  const [actorX] = useState(() => new Animated.Value(collision.actor.name === collision.target.name ? -90 : -115));
-  const [targetX] = useState(() => new Animated.Value(0));
+function CollisionAnimation({
+  collision,
+  actorPoint,
+  targetPoint,
+}: {
+  collision: RoomCollision;
+  actorPoint: { x: number; y: number };
+  targetPoint: { x: number; y: number };
+}) {
+  const [actorMove] = useState(() => new Animated.ValueXY(actorPoint));
+  const [targetMove] = useState(() => new Animated.ValueXY(targetPoint));
   const [impactScale] = useState(() => new Animated.Value(0));
   const [targetRotate] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    actorX.setValue(-115);
-    targetX.setValue(0);
+    actorMove.setValue(actorPoint);
+    targetMove.setValue(targetPoint);
     impactScale.setValue(0);
     targetRotate.setValue(0);
 
+    const dx = targetPoint.x - actorPoint.x;
+    const direction = dx >= 0 ? 1 : -1;
+    const hitX = targetPoint.x - direction * 38;
+
     const animation = Animated.sequence([
+      Animated.timing(actorMove, {
+        duration: 420,
+        toValue: { x: hitX, y: targetPoint.y },
+        useNativeDriver: true,
+      }),
       Animated.parallel([
-        Animated.timing(actorX, { duration: 330, toValue: -18, useNativeDriver: true }),
-        Animated.timing(impactScale, { duration: 330, toValue: 0.2, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.spring(actorX, { bounciness: 14, speed: 22, toValue: -6, useNativeDriver: true }),
+        Animated.timing(actorMove, {
+          duration: 90,
+          toValue: { x: targetPoint.x - direction * 8, y: targetPoint.y },
+          useNativeDriver: true,
+        }),
         Animated.sequence([
-          Animated.timing(targetX, { duration: 80, toValue: collision.kind === 'punch' ? 34 : 24, useNativeDriver: true }),
-          Animated.spring(targetX, { bounciness: 12, speed: 20, toValue: 0, useNativeDriver: true }),
+          Animated.timing(targetMove, {
+            duration: 80,
+            toValue: {
+              x: targetPoint.x + direction * (collision.kind === 'punch' ? 34 : 24),
+              y: targetPoint.y,
+            },
+            useNativeDriver: true,
+          }),
+          Animated.spring(targetMove, {
+            bounciness: 10,
+            speed: 20,
+            toValue: targetPoint,
+            useNativeDriver: true,
+          }),
         ]),
         Animated.sequence([
           Animated.timing(targetRotate, { duration: 55, toValue: 1, useNativeDriver: true }),
@@ -200,41 +240,87 @@ function CollisionAnimation({ collision }: { collision: RoomCollision }) {
           Animated.timing(targetRotate, { duration: 55, toValue: 0, useNativeDriver: true }),
         ]),
         Animated.sequence([
-          Animated.timing(impactScale, { duration: 70, toValue: 1.25, useNativeDriver: true }),
+          Animated.timing(impactScale, { duration: 70, toValue: 1.3, useNativeDriver: true }),
           Animated.spring(impactScale, { bounciness: 15, speed: 20, toValue: 1, useNativeDriver: true }),
         ]),
       ]),
     ]);
+
     animation.start();
     return () => animation.stop();
-  }, [actorX, collision.id, collision.kind, impactScale, targetRotate, targetX]);
+  }, [actorMove, actorPoint.x, actorPoint.y, collision.id, collision.kind, impactScale, targetMove, targetPoint.x, targetPoint.y, targetRotate]);
 
-  const rotate = targetRotate.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-8deg', '0deg', '8deg'] });
+  const rotate = targetRotate.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-9deg', '0deg', '9deg'] });
 
   return (
     <View pointerEvents="none" style={styles.collisionLayer}>
-      <View style={styles.collisionStage}>
-        <Animated.View style={[styles.collisionActor, { transform: [{ translateX: actorX }] }]}>
-          <AnimalCharacter animal={collision.actor.animal} scaleMultiplier={1.5} size="regular" state="working" />
-          <Text style={styles.collisionName}>{collision.actor.name}</Text>
-        </Animated.View>
+      <Animated.View style={[styles.collisionMovingActor, { transform: actorMove.getTranslateTransform() }]}>
+        <AnimalCharacter animal={collision.actor.animal} scaleMultiplier={1.5} size="regular" state="working" />
+        <Text style={styles.collisionName}>{collision.actor.name}</Text>
+      </Animated.View>
 
-        <Animated.Text style={[styles.collisionImpact, { transform: [{ scale: impactScale }] }]}>
-          {collision.kind === 'punch' ? '💥' : '💨'}
-        </Animated.Text>
+      <Animated.Text
+        style={[
+          styles.collisionImpact,
+          {
+            left: targetPoint.x + 46,
+            top: targetPoint.y + 15,
+            transform: [{ scale: impactScale }],
+          },
+        ]}
+      >
+        {collision.kind === 'punch' ? '💥' : '💨'}
+      </Animated.Text>
 
-        <Animated.View style={[styles.collisionTarget, { transform: [{ translateX: targetX }, { rotate }] }]}>
-          <AnimalCharacter animal={collision.target.animal} scaleMultiplier={1.5} size="regular" state={collision.kind === 'punch' ? 'punched' : 'pushed'} />
-          <Text style={styles.collisionName}>{collision.target.name}</Text>
-        </Animated.View>
-      </View>
+      <Animated.View
+        style={[
+          styles.collisionMovingTarget,
+          { transform: [...targetMove.getTranslateTransform(), { rotate }] },
+        ]}
+      >
+        <AnimalCharacter
+          animal={collision.target.animal}
+          scaleMultiplier={1.5}
+          size="regular"
+          state={collision.kind === 'punch' ? 'punched' : 'pushed'}
+        />
+        <Text style={styles.collisionName}>{collision.target.name}</Text>
+      </Animated.View>
     </View>
   );
 }
 
 export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false, elapsedTime = '00:00', collision = null }: RoomSceneProps) {
+  const [sceneWidth, setSceneWidth] = useState(0);
+  const [meDragOffset, setMeDragOffset] = useState({ x: 0, y: 0 });
+
+  const resolveSpot = (participant: RoomCollision['actor'] | RoomCollision['target']) => {
+    const isMe = participant.memberId === me.id || Boolean(participant.userId && participant.userId === me.userId);
+    if (isMe) return { spot: ME_SPOT, offset: meDragOffset };
+
+    const helperIndex = helpers.findIndex(
+      (member) =>
+        participant.memberId === member.id ||
+        Boolean(participant.userId && participant.userId === member.userId),
+    );
+
+    return {
+      spot: helperIndex >= 0 ? SPOTS[helperIndex] : ME_SPOT,
+      offset: { x: 0, y: 0 },
+    };
+  };
+
+  const toPoint = ({ spot, offset }: { spot: RoomSpot; offset: { x: number; y: number } }) => ({
+    x: percentToNumber(spot.left) * sceneWidth + offset.x,
+    y: spot.top + offset.y,
+  });
+
+  const actorPoint = collision ? toPoint(resolveSpot(collision.actor)) : { x: 0, y: 0 };
+  const targetPoint = collision ? toPoint(resolveSpot(collision.target)) : { x: 0, y: 0 };
+
   return (
     <ImageBackground
+      onLayout={(event) => setSceneWidth(event.nativeEvent.layout.width)}
       source={ROOM_DAY_BACKGROUND}
       resizeMode="cover"
       style={[
@@ -257,12 +343,13 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
       <Worker
         member={me}
         state={myState}
-        spot={{ left: '30%', top: 275 }}
+        spot={ME_SPOT}
         delay={120}
         forceHelp={askingHelp}
         quote={quote}
         controlsLocked={Boolean(collision)}
         hidden={Boolean(collision && (collision.actor.memberId === me.id || collision.target.memberId === me.id || collision.actor.userId === me.userId || collision.target.userId === me.userId))}
+        onDragPositionChange={setMeDragOffset}
       />
       {helpers.slice(0, 5).map((member, index) => (
         <Worker
@@ -275,7 +362,9 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         />
       ))}
 
-      {collision ? <CollisionAnimation collision={collision} /> : null}
+      {collision && sceneWidth > 0 ? (
+        <CollisionAnimation collision={collision} actorPoint={actorPoint} targetPoint={targetPoint} />
+      ) : null}
       {askingHelp && <View style={styles.helpSign}><Text style={styles.helpSignText}>！</Text></View>}
     </ImageBackground>
   );
@@ -379,25 +468,15 @@ const styles = StyleSheet.create({
   },
   followQuoteText: { color: '#6B5548', fontSize: 10, lineHeight: 14, textAlign: 'center' },
   collisionLayer: {
-    alignItems: 'center',
     bottom: 0,
-    justifyContent: 'center',
     left: 0,
     position: 'absolute',
     right: 0,
     top: 0,
     zIndex: 80,
   },
-  collisionStage: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    height: 130,
-    justifyContent: 'center',
-    position: 'relative',
-    width: 260,
-  },
-  collisionActor: { alignItems: 'center', position: 'absolute', left: 78 },
-  collisionTarget: { alignItems: 'center', position: 'absolute', right: 58 },
+  collisionMovingActor: { alignItems: 'center', left: 0, position: 'absolute', top: 0, width: 150 },
+  collisionMovingTarget: { alignItems: 'center', left: 0, position: 'absolute', top: 0, width: 150 },
   collisionImpact: { fontSize: 28, position: 'absolute', zIndex: 10 },
   collisionName: {
     backgroundColor: 'rgba(255,250,246,0.94)',
