@@ -96,11 +96,26 @@ begin
   for update;
 
   if not found then raise exception 'INVALID_ROOM_SESSION'; end if;
+  if v_session.room_id is null then raise exception 'INVALID_ROOM_SESSION'; end if;
+  if v_session.started_at > pg_catalog.now() - interval '30 seconds' then
+    raise exception 'ROOM_COMPLETION_TOO_EARLY';
+  end if;
 
   insert into public.task_completions(user_id, task, room_session_id)
   values (v_user_id, v_session.task, v_session.id)
   on conflict do nothing
   returning id into v_completion_id;
+
+  if v_completion_id is not null then
+    insert into public.room_completion_events(room_id, user_id, name, animal, task)
+    values (
+      v_session.room_id::text,
+      v_user_id,
+      v_session.name,
+      v_session.animal,
+      v_session.task
+    );
+  end if;
 
   update public.room_sessions
   set status = 'done',
@@ -658,13 +673,132 @@ with check (
 -- Existing update/delete policies continue to restrict mutation to the owner;
 -- the integrity trigger additionally prevents changing membership or expiry.
 
--- Harden existing SECURITY DEFINER room RPCs without changing their behavior.
-alter function public.send_support_event(uuid, text, uuid, text, text, text)
-  set search_path = '';
+-- ---------------------------------------------------------------------------
+-- Support events: only the secure RPC may insert. Reads and Realtime delivery
+-- are limited to the caller's current active room.
+-- ---------------------------------------------------------------------------
+
+drop policy if exists "authenticated users can read support events" on public.support_events;
+drop policy if exists "users read support events in current room" on public.support_events;
+revoke all on table public.support_events from anon, authenticated;
+grant select on table public.support_events to authenticated;
+
+create policy "users read support events in current room"
+on public.support_events for select
+to authenticated
+using (room_id = (select private.current_active_room_id()));
+
+create or replace function public.send_support_event(
+  p_room_id uuid,
+  p_request_id text,
+  p_target_user_id uuid,
+  p_kind text,
+  p_actor_name text,
+  p_actor_animal text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor_user_id uuid := auth.uid();
+  v_actor_name text;
+  v_actor_animal text;
+  v_event_id uuid;
+  v_actor_punches integer;
+  v_distinct_punchers integer;
+begin
+  if v_actor_user_id is null then raise exception 'Not authenticated'; end if;
+  if p_kind not in ('push', 'punch') then raise exception 'Invalid support kind'; end if;
+  if v_actor_user_id = p_target_user_id then raise exception 'Cannot support yourself'; end if;
+
+  select rs.name, rs.animal
+  into v_actor_name, v_actor_animal
+  from public.room_sessions rs
+  where rs.room_id = p_room_id
+    and rs.user_id = v_actor_user_id
+    and rs.expires_at > pg_catalog.now();
+
+  if not found then raise exception 'You are not in this room'; end if;
+
+  -- Lock the active help request so concurrent punch calls cannot race past
+  -- the per-user/per-request limits below.
+  perform 1
+  from public.room_sessions rs
+  where rs.room_id = p_room_id
+    and rs.user_id = p_target_user_id
+    and rs.status = 'help'
+    and rs.help_request_id = p_request_id
+    and rs.expires_at > pg_catalog.now()
+  for update;
+
+  if not found then
+    raise exception 'Help request is no longer active';
+  end if;
+
+  if p_kind = 'punch' then
+    select pg_catalog.count(*) into v_actor_punches
+    from public.support_events se
+    where se.request_id = p_request_id
+      and se.actor_user_id = v_actor_user_id
+      and se.kind = 'punch';
+
+    if v_actor_punches >= 2 then raise exception 'Punch limit reached'; end if;
+
+    select pg_catalog.count(distinct se.actor_user_id) into v_distinct_punchers
+    from public.support_events se
+    where se.request_id = p_request_id
+      and se.kind = 'punch';
+
+    if v_actor_punches = 0 and v_distinct_punchers >= 4 then
+      raise exception 'Puncher limit reached';
+    end if;
+  end if;
+
+  insert into public.support_events(
+    room_id,
+    request_id,
+    target_user_id,
+    actor_user_id,
+    actor_name,
+    actor_animal,
+    kind
+  ) values (
+    p_room_id,
+    p_request_id,
+    p_target_user_id,
+    v_actor_user_id,
+    v_actor_name,
+    v_actor_animal,
+    p_kind
+  )
+  returning id into v_event_id;
+
+  return v_event_id;
+end;
+$$;
 
 revoke execute on function public.send_support_event(uuid, text, uuid, text, text, text)
   from public, anon, authenticated;
 grant execute on function public.send_support_event(uuid, text, uuid, text, text, text)
   to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Completion events: only record_room_task_completion() inserts them. Current
+-- room peers can query/receive the event; users in other rooms and users who
+-- have left cannot read historical events.
+-- ---------------------------------------------------------------------------
+
+drop policy if exists "authenticated users can read room completion events" on public.room_completion_events;
+drop policy if exists "users can announce own completion" on public.room_completion_events;
+drop policy if exists "users read completion events in current room" on public.room_completion_events;
+revoke all on table public.room_completion_events from anon, authenticated;
+grant select on table public.room_completion_events to authenticated;
+
+create policy "users read completion events in current room"
+on public.room_completion_events for select
+to authenticated
+using (room_id = (select private.current_active_room_id())::text);
 
 commit;

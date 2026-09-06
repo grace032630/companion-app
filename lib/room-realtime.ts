@@ -155,16 +155,6 @@ export function subscribeToRoomCompletions(roomId: string, onEvent: (event: Room
     .subscribe();
 }
 
-export async function broadcastRoomCompletion(input: { roomId: string; userId: string; name: string; animal: string; task: string }) {
-  return supabase.from('room_completion_events').insert({
-    room_id: input.roomId,
-    user_id: input.userId,
-    name: input.name,
-    animal: input.animal,
-    task: input.task,
-  });
-}
-
 export function subscribeToSupportEvents(roomId: string, userId: string, onEvent: (event: SupportEvent) => void): RealtimeChannel {
   return supabase
     .channel(`support-${roomId}-${userId}`)
