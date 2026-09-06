@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import type { AnimalAnimationState, CrewMember } from '../types/crew';
+import { isGrayCat } from '../constants/crew';
 import { AnimalCharacter } from './AnimalCharacter';
+import { GrayCatActor, type GrayCatActorState } from './actors/GrayCatActor';
 import { ConstructionAction } from './ConstructionAction';
 
 type RoomSceneProps = {
@@ -23,11 +25,18 @@ const SPOTS = [
   { left: '38%', top: 345 },
 ] as const;
 
-function Worker({ member, state = 'working', spot, delay = 0 }: { member: CrewMember; state?: AnimalAnimationState; spot: { left: string; top: number }; delay?: number }) {
+// Temporarily switch this to true while calibrating the gray cat base pose.
+const SHOW_GRAY_CAT_DEBUG = false;
+
+function grayCatState(state: AnimalAnimationState): GrayCatActorState {
+  return state === 'punched' ? 'hit' : state;
+}
+
+function Worker({ member, state = 'working', spot, delay = 0 }: { member: CrewMember; state?: AnimalAnimationState; spot: { left: `${number}%`; top: number }; delay?: number }) {
   const [walk] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    if (state !== 'working') {
+    if (state !== 'working' || isGrayCat(member.animal)) {
       walk.stopAnimation();
       walk.setValue(0);
       return;
@@ -41,14 +50,16 @@ function Worker({ member, state = 'working', spot, delay = 0 }: { member: CrewMe
     );
     animation.start();
     return () => animation.stop();
-  }, [delay, state, walk]);
+  }, [delay, member.animal, state, walk]);
 
   const driftX = walk.interpolate({ inputRange: [0, 1], outputRange: [-2, 3] });
 
   return (
     <Animated.View style={[styles.worker, { left: spot.left, top: spot.top, transform: [{ translateX: driftX }] }]}>
       <View style={styles.workerBubbleRow}>
-        <AnimalCharacter animal={member.animal} size={member.isMe ? 'large' : 'regular'} state={state} />
+        {isGrayCat(member.animal)
+          ? <GrayCatActor showDebug={SHOW_GRAY_CAT_DEBUG} size={member.isMe ? 78 : 58} state={grayCatState(state)} />
+          : <AnimalCharacter animal={member.animal} size={member.isMe ? 'large' : 'regular'} state={state} />}
         {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
       </View>
       <View style={[styles.namePill, member.isMe && styles.meNamePill]}>

@@ -1,6 +1,12 @@
 import type { ConstructionActionId } from '../types/crew';
 
-export const ANIMAL_OPTIONS = ['🐱', '🐶', '🐰', '🦊', '🐻', '🐼', '🐹', '🐯'] as const;
+export const GRAY_CAT_ANIMAL = '🐱' as const;
+
+export const ANIMAL_OPTIONS = [GRAY_CAT_ANIMAL, '🐶', '🐰', '🦊', '🐻', '🐼', '🐹', '🐯'] as const;
+
+export function isGrayCat(animal: string): boolean {
+  return animal === GRAY_CAT_ANIMAL;
+}
 
 export const NAME_OPTIONS = ['小橘', '阿灰', '奶糖', '豆包', '栗子', '麻糬', 'Mumu', 'Yuki', '布丁', '小麥', '米米', '阿福'] as const;
 
