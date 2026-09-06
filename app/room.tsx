@@ -4,9 +4,8 @@ import { ActivityIndicator, Animated, BackHandler, Modal, Pressable, ScrollView,
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
-import { GrayCatActor, type GrayCatActorState } from '../components/actors/GrayCatActor';
 import { RoomScene } from '../components/RoomScene';
-import { ANIMAL_OPTIONS, CONSTRUCTION_ACTION_IDS, isGrayCat, NAME_OPTIONS } from '../constants/crew';
+import { ANIMAL_OPTIONS, CONSTRUCTION_ACTION_IDS, NAME_OPTIONS } from '../constants/crew';
 import { useAuth } from '../lib/auth';
 import { useProfile } from '../lib/profile';
 import {
@@ -43,8 +42,7 @@ function makeNpcPool(): CrewMember[] { const actions=shuffle(CONSTRUCTION_ACTION
 function makeBoardItem(member:CrewMember,task:Task,kind:RoomStatus='working'):BoardItem { const text=kind==='done'?`完成了「${task}」 🎉`:kind==='help'?`做「${task}」卡住了，需要幫忙`:`正在做「${task}」`; return {id:member.id,animal:member.animal,name:member.name,text,kind,helper:Boolean(member.isNpc)}; }
 function makeSessionBoardItem(session:RoomSession):BoardItem { return {...makeBoardItem(roomSessionToCrewMember(session),isTask(session.task)?session.task:'其他事項',session.status),targetUserId:session.user_id,requestId:session.help_request_id}; }
 function boardState(kind:RoomStatus):AnimalAnimationState { return kind==='done'?'done':kind==='help'?'idle':'working'; }
-function grayCatState(state:AnimalAnimationState):GrayCatActorState { return state==='punched'?'hit':state; }
-function RoomAnimal({animal,size,state}:{animal:string;size:number;state:AnimalAnimationState}) { return isGrayCat(animal)?<GrayCatActor size={size} state={grayCatState(state)}/>:<AnimalCharacter animal={animal} size={size<=32?'small':'regular'} state={state}/>; }
+function RoomAnimal({animal,size,state}:{animal:string;size:number;state:AnimalAnimationState}) { return <AnimalCharacter animal={animal} size={size<=32?'small':'regular'} state={state}/>; }
 
 export default function RoomScreen(){
   const {session}=useAuth();
