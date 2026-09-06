@@ -144,7 +144,7 @@ export default function LoginScreen() {
     <View style={styles.background}>
       <Image
         source={require('../assets/backgrounds/login-bg.png')}
-        resizeMode="contain"
+        resizeMode="cover"
         style={styles.backgroundImage}
       />
       <SafeAreaView style={styles.safeArea}>
@@ -253,7 +253,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   background: { backgroundColor: '#F7E6D2', flex: 1, overflow: 'hidden', width: '100%' },
-  backgroundImage: { height: undefined, left: 0, position: 'absolute', top: 0, width: '100%', aspectRatio: 1024 / 1792 },
+  backgroundImage: { bottom: 0, height: '100%', left: 0, position: 'absolute', right: 0, top: 0, width: '100%' },
   safeArea: { backgroundColor: 'transparent', flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 20 },
   content: { alignSelf: 'center', flex: 1, justifyContent: 'flex-end', maxWidth: 430, minHeight: '100%', paddingBottom: 18, paddingTop: 390, width: '100%' },
