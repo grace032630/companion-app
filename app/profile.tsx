@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   ImageBackground,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -21,6 +22,7 @@ import { useAuth } from '../lib/auth';
 import { MAX_QUOTE_LENGTH, validatePublicQuote } from '../lib/content-filter';
 import { LANGUAGE_OPTIONS } from '../lib/i18n';
 import { useProfile, type AppLanguage } from '../lib/profile';
+import { claimDailyStrawberry, fetchStrawberryTotal } from '../lib/strawberries';
 import { supabase } from '../lib/supabase';
 
 const EMPTY_SUMMARY: ActivitySummary = {
@@ -35,6 +37,8 @@ export default function ProfileScreen() {
   const { session } = useAuth();
   const { profile, saveProfile } = useProfile();
   const [summary, setSummary] = useState<ActivitySummary>(EMPTY_SUMMARY);
+  const [strawberryTotal, setStrawberryTotal] = useState(0);
+  const [strawberryOpen, setStrawberryOpen] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(profile?.nickname ?? '');
@@ -58,7 +62,17 @@ export default function ProfileScreen() {
     if (!userId) return;
     setLoadingSummary(true);
     try {
-      setSummary(await fetchActivitySummary(userId));
+      const nextSummary = await fetchActivitySummary(userId);
+      setSummary(nextSummary);
+      try {
+        if (nextSummary.todayCompleted > 0) {
+          const claimed = await claimDailyStrawberry();
+          if (claimed) setStrawberryOpen(true);
+        }
+        setStrawberryTotal(await fetchStrawberryTotal(userId));
+      } catch {
+        // Strawberry rewards are optional until the migration has been applied.
+      }
     } catch {
       setSummary(EMPTY_SUMMARY);
     } finally {
@@ -156,8 +170,13 @@ export default function ProfileScreen() {
               </View>
 
               <Text style={styles.name}>{profile.nickname}</Text>
-              <View style={styles.levelPill}>
-                <Text style={styles.levelText}>施工 {summary.todayCompleted + summary.weekCompleted} 次</Text>
+              <View style={styles.profilePillsRow}>
+                <View style={styles.levelPill}>
+                  <Text style={styles.levelText}>施工 {summary.todayCompleted + summary.weekCompleted} 次</Text>
+                </View>
+                <View style={styles.strawberryPill}>
+                  <Text style={styles.strawberryPillText}>🍓 {strawberryTotal}</Text>
+                </View>
               </View>
 
               {profile.quote ? (
@@ -305,6 +324,19 @@ export default function ProfileScreen() {
               {signingOut ? <ActivityIndicator color="#8A6450" /> : <Text style={styles.signOutText}>Sign out</Text>}
             </Pressable>
           </ScrollView>
+
+          <Modal animationType="fade" onRequestClose={() => setStrawberryOpen(false)} transparent visible={strawberryOpen}>
+            <View style={styles.rewardOverlay}>
+              <View style={styles.rewardCard}>
+                <Text style={styles.rewardEmoji}>🍓</Text>
+                <Text style={styles.rewardTitle}>補發今天的草莓！</Text>
+                <Text style={styles.rewardSubtitle}>你今天已經完成每日施工，所以照樣算 +1</Text>
+                <Pressable onPress={() => setStrawberryOpen(false)} style={styles.rewardButton}>
+                  <Text style={styles.rewardButtonText}>收下草莓</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -333,8 +365,11 @@ const styles = StyleSheet.create({
   characterStage: { alignItems: 'center', backgroundColor: 'rgba(255,248,239,0.92)', borderColor: '#E4CDB8', borderRadius: 54, borderWidth: 1, height: 108, justifyContent: 'center', width: 108 },
   avatarLamp: { fontSize: 22, position: 'absolute', right: -14, top: -12 },
   name: { color: '#4E4037', fontSize: 24, fontWeight: '900', marginTop: 12 },
-  levelPill: { backgroundColor: 'rgba(239,211,185,0.92)', borderRadius: 12, marginTop: 7, paddingHorizontal: 10, paddingVertical: 4 },
+  profilePillsRow: { flexDirection: 'row', gap: 8, marginTop: 7 },
+  levelPill: { backgroundColor: 'rgba(239,211,185,0.92)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   levelText: { color: '#7A583F', fontSize: 11, fontWeight: '800' },
+  strawberryPill: { backgroundColor: 'rgba(255,232,235,0.94)', borderColor: '#E9B9C1', borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
+  strawberryPillText: { color: '#A54F61', fontSize: 11, fontWeight: '900' },
   speechBubble: { backgroundColor: 'rgba(255,255,255,0.92)', borderColor: '#E7D8CC', borderRadius: 15, borderWidth: 1, marginTop: 10, maxWidth: '88%', paddingHorizontal: 13, paddingVertical: 9 },
   quote: { color: '#735D50', fontSize: 13, textAlign: 'center' },
   editButton: { backgroundColor: 'rgba(255,255,255,0.92)', borderColor: '#E7D8CC', borderRadius: 14, borderWidth: 1, marginTop: 16, paddingHorizontal: 16, paddingVertical: 10 },
@@ -388,4 +423,11 @@ const styles = StyleSheet.create({
   message: { color: '#805844', fontSize: 13, marginTop: 14, textAlign: 'center' },
   signOutButton: { alignItems: 'center', borderColor: '#DFC9B9', borderRadius: 16, borderWidth: 1, justifyContent: 'center', marginTop: 24, minHeight: 52 },
   signOutText: { color: '#8A6450', fontSize: 14, fontWeight: '800' },
+  rewardOverlay: { alignItems: 'center', backgroundColor: 'rgba(73,61,52,.38)', flex: 1, justifyContent: 'center', padding: 24 },
+  rewardCard: { alignItems: 'center', backgroundColor: '#FFF9F1', borderColor: '#F3C8D0', borderRadius: 28, borderWidth: 2, maxWidth: 320, padding: 26, width: '100%' },
+  rewardEmoji: { fontSize: 58 },
+  rewardTitle: { color: '#6B3D3D', fontSize: 20, fontWeight: '900', marginTop: 10, textAlign: 'center' },
+  rewardSubtitle: { color: '#9A6A6A', fontSize: 13, lineHeight: 19, marginTop: 7, textAlign: 'center' },
+  rewardButton: { alignItems: 'center', backgroundColor: '#D95C73', borderRadius: 15, justifyContent: 'center', marginTop: 20, minHeight: 48, paddingHorizontal: 24 },
+  rewardButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
 });
