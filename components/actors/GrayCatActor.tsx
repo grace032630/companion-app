@@ -19,17 +19,17 @@ const BODY = require('../../assets/characters/gray-cat/body.png');
 const TAIL = require('../../assets/characters/gray-cat/tail.png');
 const PAW_LEFT = require('../../assets/characters/gray-cat/paw_left.png');
 const PAW_RIGHT = require('../../assets/characters/gray-cat/paw_right.png');
+const EYES_CLOSED = require('../../assets/characters/gray-cat/eyes_closed.png');
+const EYES_OPEN = require('../../assets/characters/gray-cat/eyes_open.png');
 
 export const GRAY_CAT_BASE_SIZE = 160;
 
-// Coordinates use a 160 x 160 calibration canvas. Each PNG has different
-// transparent padding, so these boxes intentionally do not share an origin.
 export const GRAY_CAT_BASE_POSE: Record<PartName, PartPlacement> = {
-  tail: { left: 0, top: 64, width: 84, height: 84 },
-  body: { left: 29, top: 58, width: 102, height: 102 },
-  pawLeft: { left: 22, top: 72, width: 68, height: 68 },
-  pawRight: { left: 70, top: 70, width: 68, height: 68 },
-  head: { left: 24, top: 2, width: 112, height: 112 },
+  tail: { left: 4, top: 68, width: 78, height: 78 },
+  body: { left: 30, top: 55, width: 100, height: 105 },
+  pawLeft: { left: 25, top: 82, width: 61, height: 61 },
+  pawRight: { left: 76, top: 80, width: 61, height: 61 },
+  head: { left: 27, top: 5, width: 106, height: 106 },
 };
 
 const DEBUG_COLORS: Record<PartName, string> = {
@@ -54,37 +54,65 @@ function debugStyle(name: PartName, showDebug: boolean): ViewStyle | undefined {
   return showDebug ? { borderColor: DEBUG_COLORS[name], borderWidth: 1 } : undefined;
 }
 
-export function GrayCatActor({ size = GRAY_CAT_BASE_SIZE, state = 'idle', quote, showQuote = false, showDebug = false }: GrayCatActorProps) {
+export function GrayCatActor({
+  size = GRAY_CAT_BASE_SIZE,
+  state = 'idle',
+  quote,
+  showQuote = false,
+  showDebug = false,
+}: GrayCatActorProps) {
   const [floatMotion] = useState(() => new Animated.Value(0));
   const [tailMotion] = useState(() => new Animated.Value(0));
+  const [pawMotion] = useState(() => new Animated.Value(0));
   const scale = size / GRAY_CAT_BASE_SIZE;
 
   useEffect(() => {
     floatMotion.stopAnimation();
     tailMotion.stopAnimation();
+    pawMotion.stopAnimation();
     floatMotion.setValue(0);
     tailMotion.setValue(0);
+    pawMotion.setValue(0);
 
-    if (state !== 'idle') return;
+    if (state === 'help') return;
 
-    const animation = Animated.parallel([
-      Animated.loop(Animated.sequence([
-        Animated.timing(floatMotion, { duration: 1200, toValue: 1, useNativeDriver: true }),
-        Animated.timing(floatMotion, { duration: 1200, toValue: 0, useNativeDriver: true }),
-      ])),
-      Animated.loop(Animated.sequence([
-        Animated.timing(tailMotion, { duration: 760, toValue: 1, useNativeDriver: true }),
-        Animated.timing(tailMotion, { duration: 760, toValue: 0, useNativeDriver: true }),
-      ])),
-    ]);
+    const loops: Animated.CompositeAnimation[] = [
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(floatMotion, { duration: 950, toValue: 1, useNativeDriver: true }),
+          Animated.timing(floatMotion, { duration: 950, toValue: 0, useNativeDriver: true }),
+        ]),
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(tailMotion, { duration: 700, toValue: 1, useNativeDriver: true }),
+          Animated.timing(tailMotion, { duration: 700, toValue: 0, useNativeDriver: true }),
+        ]),
+      ),
+    ];
 
+    if (state === 'working') {
+      loops.push(
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pawMotion, { duration: 260, toValue: 1, useNativeDriver: true }),
+            Animated.timing(pawMotion, { duration: 260, toValue: 0, useNativeDriver: true }),
+          ]),
+        ),
+      );
+    }
+
+    const animation = Animated.parallel(loops);
     animation.start();
     return () => animation.stop();
-  }, [floatMotion, state, tailMotion]);
+  }, [floatMotion, pawMotion, state, tailMotion]);
 
-  const bodyY = floatMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -2 * scale] });
-  const headY = floatMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -1.5 * scale] });
-  const tailRotate = tailMotion.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '4deg'] });
+  const bodyY = floatMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -2.5 * scale] });
+  const headY = floatMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -2 * scale] });
+  const tailRotate = tailMotion.interpolate({ inputRange: [0, 1], outputRange: ['-6deg', '7deg'] });
+  const leftPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['-16deg', '8deg'] });
+  const rightPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['13deg', '-10deg'] });
+  const eyeSource = state === 'help' ? EYES_OPEN : EYES_CLOSED;
 
   return (
     <View accessibilityLabel={`灰白貓，${state}`} style={[styles.canvas, { height: size, width: size }]}>
@@ -102,16 +130,31 @@ export function GrayCatActor({ size = GRAY_CAT_BASE_SIZE, state = 'idle', quote,
         <Image resizeMode="contain" source={BODY} style={styles.image} />
       </Animated.View>
 
-      <View style={[styles.part, scaledPlacement('pawLeft', scale), debugStyle('pawLeft', showDebug)]}>
+      <Animated.View
+        style={[
+          styles.part,
+          scaledPlacement('pawLeft', scale),
+          debugStyle('pawLeft', showDebug),
+          { transform: [{ scaleX: -1 }, { rotate: leftPawRotate }] },
+        ]}
+      >
         <Image resizeMode="contain" source={PAW_LEFT} style={styles.image} />
-      </View>
+      </Animated.View>
 
-      <View style={[styles.part, scaledPlacement('pawRight', scale), debugStyle('pawRight', showDebug)]}>
+      <Animated.View
+        style={[
+          styles.part,
+          scaledPlacement('pawRight', scale),
+          debugStyle('pawRight', showDebug),
+          { transform: [{ rotate: rightPawRotate }] },
+        ]}
+      >
         <Image resizeMode="contain" source={PAW_RIGHT} style={styles.image} />
-      </View>
+      </Animated.View>
 
       <Animated.View style={[styles.part, scaledPlacement('head', scale), debugStyle('head', showDebug), { transform: [{ translateY: headY }] }]}>
         <Image resizeMode="contain" source={HEAD} style={styles.image} />
+        <Image pointerEvents="none" resizeMode="contain" source={eyeSource} style={styles.eyeOverlay} />
       </Animated.View>
     </View>
   );
@@ -121,6 +164,18 @@ const styles = StyleSheet.create({
   canvas: { position: 'relative' },
   part: { position: 'absolute' },
   image: { height: '100%', width: '100%' },
-  quoteBubble: { backgroundColor: '#FFFFFF', borderColor: '#E9D8CB', borderRadius: 12, borderWidth: 1, bottom: '78%', left: '62%', paddingHorizontal: 8, paddingVertical: 5, position: 'absolute', zIndex: 10 },
+  eyeOverlay: { height: '100%', left: 0, position: 'absolute', top: 0, width: '100%' },
+  quoteBubble: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E9D8CB',
+    borderRadius: 12,
+    borderWidth: 1,
+    bottom: '78%',
+    left: '62%',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    position: 'absolute',
+    zIndex: 10,
+  },
   quoteText: { color: '#6B5548', fontSize: 10, lineHeight: 13 },
 });
