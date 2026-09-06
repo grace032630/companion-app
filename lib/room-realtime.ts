@@ -17,6 +17,8 @@ export type RoomSession = {
   action: ConstructionActionId;
   help_request_id: string | null;
   last_seen: string;
+  started_at: string;
+  expires_at: string;
   quote?: string | null;
 };
 
@@ -53,13 +55,25 @@ export type JoinRoomInput = {
   action: ConstructionActionId;
 };
 
-const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
-
 export async function assignRoom(maxMembers = 6): Promise<string> {
   const { data, error } = await supabase.rpc('assign_room', { p_max_members: maxMembers });
   if (error) throw error;
   if (!data) throw new Error('找不到可加入的房間');
   return data as string;
+}
+
+export async function fetchOwnActiveRoomSession(userId: string): Promise<RoomSession | null> {
+  const { data, error } = await supabase
+    .from('room_sessions')
+    .select('id,room_id,user_id,name,animal,task,status,action,help_request_id,last_seen,started_at,expires_at')
+    .eq('user_id', userId)
+    .gt('expires_at', new Date().toISOString())
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as RoomSession | null) ?? null;
 }
 
 export async function joinRoom(input: JoinRoomInput) {
@@ -86,7 +100,8 @@ export async function updateRoomSession(
     .from('room_sessions')
     .update({ ...updates, last_seen: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .gt('expires_at', new Date().toISOString());
 }
 
 export async function heartbeatRoomSession(id: string, userId: string) {
@@ -94,7 +109,8 @@ export async function heartbeatRoomSession(id: string, userId: string) {
     .from('room_sessions')
     .update({ last_seen: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .gt('expires_at', new Date().toISOString());
 }
 
 export async function leaveRoom(id: string, userId: string) {
@@ -102,14 +118,13 @@ export async function leaveRoom(id: string, userId: string) {
 }
 
 export async function fetchActiveRoomSessions(userId: string, roomId: string): Promise<RoomSession[]> {
-  const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS).toISOString();
   const { data, error } = await supabase
     .from('room_sessions')
-    .select('id,room_id,user_id,name,animal,task,status,action,help_request_id,last_seen')
+    .select('id,room_id,user_id,name,animal,task,status,action,help_request_id,last_seen,started_at,expires_at')
     .eq('room_id', roomId)
     .neq('user_id', userId)
-    .gt('last_seen', cutoff)
-    .order('last_seen', { ascending: false })
+    .gt('expires_at', new Date().toISOString())
+    .order('started_at', { ascending: true })
     .limit(5);
 
   if (error) throw error;
