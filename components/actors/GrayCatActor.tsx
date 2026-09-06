@@ -208,14 +208,14 @@ const styles = StyleSheet.create({
     height: '20%',
     left: '25%',
     position: 'absolute',
-    top: '34%',
+    top: '44%',
     width: '20%',
   },
   openEyeRight: {
     height: '20%',
     position: 'absolute',
     right: '25%',
-    top: '34%',
+    top: '44%',
     width: '20%',
   },
   // eyes_closed.png uses a small 160x160 calibration canvas. It needs to sit
@@ -224,8 +224,8 @@ const styles = StyleSheet.create({
     height: '100%',
     left: 0,
     position: 'absolute',
-    top: '8%',
-    transform: [{ scaleX: 1.25 }],
+    top: '15%',
+    transform: [{ scaleX: 1.5 }],
     width: '100%',
   },
 
