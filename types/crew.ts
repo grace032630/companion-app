@@ -10,4 +10,5 @@ export type CrewMember = {
   isMe: boolean;
   isNpc?: boolean;
   userId?: string;
+  quote?: string | null;
 };
