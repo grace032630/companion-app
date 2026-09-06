@@ -38,6 +38,8 @@ const SPOTS = [
   { left: '31%', top: 430 },
 ] as const;
 
+const CELEBRATION_MESSAGES = ['恭喜！', '做完啦！', '太強了吧！', '耶～～！', '辛苦啦！'];
+
 function percentToNumber(value: `${number}%`) {
   return Number(value.replace('%', '')) / 100;
 }
@@ -56,6 +58,7 @@ function Worker({
   controlsLocked = false,
   hidden = false,
   onDragPositionChange,
+  celebrationText,
 }: {
   member: CrewMember;
   state?: AnimalAnimationState;
@@ -66,6 +69,7 @@ function Worker({
   controlsLocked?: boolean;
   hidden?: boolean;
   onDragPositionChange?: (position: { x: number; y: number }) => void;
+  celebrationText?: string;
 }) {
   const [walk] = useState(() => new Animated.Value(0));
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -158,7 +162,11 @@ function Worker({
         },
       ]}
     >
-      {member.isMe && quote ? (
+      {celebrationText ? (
+        <View pointerEvents="none" style={styles.celebrationBubble}>
+          <Text numberOfLines={2} style={styles.celebrationBubbleText}>{celebrationText}</Text>
+        </View>
+      ) : member.isMe && quote ? (
         <View pointerEvents="none" style={styles.followQuoteBubble}>
           <Text numberOfLines={3} style={styles.followQuoteText}>{quote}</Text>
         </View>
@@ -179,6 +187,68 @@ function Worker({
       {state === 'idle' && <Text style={styles.reaction}>🥺</Text>}
       {state === 'done' && <Text style={styles.reaction}>🎉</Text>}
     </Animated.View>
+  );
+}
+
+function CelebrationEffects() {
+  const [bursts] = useState(() =>
+    Array.from({ length: 6 }, () => ({
+      scale: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+    })),
+  );
+
+  useEffect(() => {
+    const animations = bursts.map((burst, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 280),
+          Animated.parallel([
+            Animated.timing(burst.opacity, { duration: 120, toValue: 1, useNativeDriver: true }),
+            Animated.spring(burst.scale, { bounciness: 16, speed: 16, toValue: 1, useNativeDriver: true }),
+          ]),
+          Animated.delay(420),
+          Animated.parallel([
+            Animated.timing(burst.opacity, { duration: 260, toValue: 0, useNativeDriver: true }),
+            Animated.timing(burst.scale, { duration: 260, toValue: 1.55, useNativeDriver: true }),
+          ]),
+          Animated.delay(500),
+          Animated.timing(burst.scale, { duration: 1, toValue: 0, useNativeDriver: true }),
+        ]),
+      ),
+    );
+
+    animations.forEach((animation) => animation.start());
+    return () => animations.forEach((animation) => animation.stop());
+  }, [bursts]);
+
+  const positions = [
+    { left: '8%', top: 58, emoji: '🎆' },
+    { left: '69%', top: 82, emoji: '🎇' },
+    { left: '35%', top: 120, emoji: '✨' },
+    { left: '16%', top: 165, emoji: '🎉' },
+    { left: '76%', top: 190, emoji: '✨' },
+    { left: '48%', top: 62, emoji: '🎆' },
+  ] as const;
+
+  return (
+    <View pointerEvents="none" style={styles.celebrationLayer}>
+      {bursts.map((burst, index) => (
+        <Animated.Text
+          key={index}
+          style={[
+            styles.firework,
+            positions[index],
+            { opacity: burst.opacity, transform: [{ scale: burst.scale }] },
+          ]}
+        >
+          {positions[index].emoji}
+        </Animated.Text>
+      ))}
+      <View style={styles.celebrationBanner}>
+        <Text style={styles.celebrationBannerText}>🎊 任務完成！ 🎊</Text>
+      </View>
+    </View>
   );
 }
 
@@ -347,7 +417,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         delay={120}
         forceHelp={askingHelp}
         quote={quote}
-        controlsLocked={Boolean(collision)}
+        controlsLocked={Boolean(collision) || finished}
         hidden={Boolean(collision && (collision.actor.memberId === me.id || collision.target.memberId === me.id || collision.actor.userId === me.userId || collision.target.userId === me.userId))}
         onDragPositionChange={setMeDragOffset}
       />
@@ -355,16 +425,19 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         <Worker
           key={member.id}
           member={member}
+          state={finished ? 'done' : 'working'}
           spot={SPOTS[index]}
           delay={index * 170 + 80}
-          controlsLocked={Boolean(collision)}
+          controlsLocked={Boolean(collision) || finished}
           hidden={Boolean(collision && (collision.actor.memberId === member.id || collision.target.memberId === member.id || collision.actor.userId === member.userId || collision.target.userId === member.userId))}
+          celebrationText={finished ? CELEBRATION_MESSAGES[index % CELEBRATION_MESSAGES.length] : undefined}
         />
       ))}
 
       {collision && sceneWidth > 0 ? (
         <CollisionAnimation collision={collision} actorPoint={actorPoint} targetPoint={targetPoint} />
       ) : null}
+      {finished ? <CelebrationEffects /> : null}
       {askingHelp && <View style={styles.helpSign}><Text style={styles.helpSignText}>！</Text></View>}
     </ImageBackground>
   );
@@ -467,6 +540,46 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   followQuoteText: { color: '#6B5548', fontSize: 10, lineHeight: 14, textAlign: 'center' },
+  celebrationBubble: {
+    backgroundColor: '#FFF7C9',
+    borderColor: '#E7C45A',
+    borderRadius: 13,
+    borderWidth: 1,
+    bottom: '100%',
+    left: '50%',
+    marginBottom: 5,
+    minWidth: 62,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    position: 'absolute',
+    transform: [{ translateX: -31 }],
+    zIndex: 35,
+  },
+  celebrationBubbleText: { color: '#76551E', fontSize: 10, fontWeight: '900', textAlign: 'center' },
+  celebrationLayer: {
+    bottom: 0,
+    left: 0,
+    pointerEvents: 'none',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 70,
+  },
+  firework: { fontSize: 36, position: 'absolute' },
+  celebrationBanner: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,248,214,0.94)',
+    borderColor: '#E8C85A',
+    borderRadius: 18,
+    borderWidth: 2,
+    left: '24%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    position: 'absolute',
+    top: 135,
+    width: '52%',
+  },
+  celebrationBannerText: { color: '#6D4B18', fontSize: 14, fontWeight: '900', textAlign: 'center' },
   collisionLayer: {
     bottom: 0,
     left: 0,
