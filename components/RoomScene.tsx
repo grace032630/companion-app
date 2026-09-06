@@ -54,7 +54,9 @@ function Worker({
   const dragStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (state !== 'working') {
+    const shouldAutoMove = state === 'working' || forceHelp;
+
+    if (!shouldAutoMove) {
       walk.stopAnimation();
       walk.setValue(0);
       return;
@@ -77,7 +79,7 @@ function Worker({
     );
     animation.start();
     return () => animation.stop();
-  }, [delay, state, walk]);
+  }, [delay, forceHelp, state, walk]);
 
   const panResponder = useMemo(
     () => PanResponder.create({
