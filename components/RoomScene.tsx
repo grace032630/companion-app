@@ -5,7 +5,23 @@ import type { AnimalAnimationState, CrewMember } from '../types/crew';
 import { AnimalCharacter } from './AnimalCharacter';
 import { ConstructionAction } from './ConstructionAction';
 
-const ROOM_DAY_BACKGROUND = require('../assets/backgrounds/room-day.png');
+const DAY_BACKGROUNDS = [
+  require('../assets/backgrounds/room-day.png'),
+  require('../assets/backgrounds/room-day-2.png'),
+  require('../assets/backgrounds/room-day-3.png'),
+];
+
+const NIGHT_BACKGROUNDS = [
+  require('../assets/backgrounds/room-night-1.png'),
+  require('../assets/backgrounds/room-night-2.png'),
+];
+
+function pickRoomBackground() {
+  const hour = new Date().getHours();
+  const isNight = hour >= 19 || hour < 4;
+  const pool = isNight ? NIGHT_BACKGROUNDS : DAY_BACKGROUNDS;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 export type RoomCollision = {
   id: string;
@@ -29,7 +45,6 @@ type RoomSceneProps = {
 type RoomSpot = { left: `${number}%`; top: number };
 
 const ME_SPOT: RoomSpot = { left: '30%', top: 275 };
-
 const SPOTS = [
   { left: '-2%', top: 215 },
   { left: '63%', top: 215 },
@@ -62,7 +77,7 @@ function Worker({
 }: {
   member: CrewMember;
   state?: AnimalAnimationState;
-  spot: { left: `${number}%`; top: number };
+  spot: RoomSpot;
   delay?: number;
   forceHelp?: boolean;
   quote?: string | null;
@@ -78,7 +93,6 @@ function Worker({
 
   useEffect(() => {
     const shouldAutoMove = state === 'working' || forceHelp;
-
     if (!shouldAutoMove) {
       walk.stopAnimation();
       walk.setValue(0);
@@ -88,16 +102,8 @@ function Worker({
     const animation = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
-        Animated.timing(walk, {
-          duration: 1200 + delay / 2,
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-        Animated.timing(walk, {
-          duration: 1200 + delay / 2,
-          toValue: 0,
-          useNativeDriver: true,
-        }),
+        Animated.timing(walk, { duration: 1200 + delay / 2, toValue: 1, useNativeDriver: true }),
+        Animated.timing(walk, { duration: 1200 + delay / 2, toValue: 0, useNativeDriver: true }),
       ]),
     );
     animation.start();
@@ -105,40 +111,35 @@ function Worker({
   }, [delay, forceHelp, state, walk]);
 
   const panResponder = useMemo(
-    () => PanResponder.create({
-      onStartShouldSetPanResponder: () => Boolean(member.isMe && !controlsLocked),
-      onMoveShouldSetPanResponder: (_, gesture) => Boolean(member.isMe && !controlsLocked && (Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3)),
-      onPanResponderGrant: () => {
-        dragStart.current = { ...dragCurrent.current };
-      },
-      onPanResponderMove: (_, gesture) => {
-        if (!member.isMe) return;
-        const x = clamp(dragStart.current.x + gesture.dx, -145, 95);
-        const y = clamp(dragStart.current.y + gesture.dy, -25, 205);
-        drag.setValue({ x, y });
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (!member.isMe) return;
-        const x = clamp(dragStart.current.x + gesture.dx, -145, 95);
-        const y = clamp(dragStart.current.y + gesture.dy, -25, 205);
-        dragCurrent.current = { x, y };
-        onDragPositionChange?.({ x, y });
-        Animated.spring(drag, {
-          toValue: { x, y },
-          bounciness: 5,
-          speed: 18,
-          useNativeDriver: true,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(drag, {
-          toValue: dragCurrent.current,
-          bounciness: 5,
-          speed: 18,
-          useNativeDriver: true,
-        }).start();
-      },
-    }),
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => Boolean(member.isMe && !controlsLocked),
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Boolean(member.isMe && !controlsLocked && (Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3)),
+        onPanResponderGrant: () => {
+          dragStart.current = { ...dragCurrent.current };
+        },
+        onPanResponderMove: (_, gesture) => {
+          if (!member.isMe) return;
+          drag.setValue({
+            x: clamp(dragStart.current.x + gesture.dx, -145, 95),
+            y: clamp(dragStart.current.y + gesture.dy, -25, 205),
+          });
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (!member.isMe) return;
+          const next = {
+            x: clamp(dragStart.current.x + gesture.dx, -145, 95),
+            y: clamp(dragStart.current.y + gesture.dy, -25, 205),
+          };
+          dragCurrent.current = next;
+          onDragPositionChange?.(next);
+          Animated.spring(drag, { toValue: next, bounciness: 5, speed: 18, useNativeDriver: true }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(drag, { toValue: dragCurrent.current, bounciness: 5, speed: 18, useNativeDriver: true }).start();
+        },
+      }),
     [controlsLocked, drag, member.isMe, onDragPositionChange],
   );
 
@@ -155,10 +156,7 @@ function Worker({
         {
           left: spot.left,
           top: spot.top,
-          transform: [
-            { translateX: autoAndDragX },
-            { translateY: drag.y },
-          ],
+          transform: [{ translateX: autoAndDragX }, { translateY: drag.y }],
         },
       ]}
     >
@@ -171,15 +169,12 @@ function Worker({
           <Text numberOfLines={3} style={styles.followQuoteText}>{quote}</Text>
         </View>
       ) : null}
+
       <View style={styles.workerBubbleRow}>
-        <AnimalCharacter
-          animal={member.animal}
-          scaleMultiplier={1.5}
-          size="regular"
-          state={forceHelp ? 'idle' : state}
-        />
+        <AnimalCharacter animal={member.animal} scaleMultiplier={1.5} size="regular" state={forceHelp ? 'idle' : state} />
         {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
       </View>
+
       <View style={[styles.namePill, member.isMe && styles.meNamePill]}>
         <Text numberOfLines={1} style={styles.nameText}>{member.isMe ? `${member.name} · 我` : member.name}</Text>
         {member.isNpc && <Text style={styles.npcTag}>小幫手</Text>}
@@ -192,10 +187,7 @@ function Worker({
 
 function CelebrationEffects() {
   const [bursts] = useState(() =>
-    Array.from({ length: 6 }, () => ({
-      scale: new Animated.Value(0),
-      opacity: new Animated.Value(0),
-    })),
+    Array.from({ length: 6 }, () => ({ scale: new Animated.Value(0), opacity: new Animated.Value(0) })),
   );
 
   useEffect(() => {
@@ -217,7 +209,6 @@ function CelebrationEffects() {
         ]),
       ),
     );
-
     animations.forEach((animation) => animation.start());
     return () => animations.forEach((animation) => animation.stop());
   }, [bursts]);
@@ -236,11 +227,7 @@ function CelebrationEffects() {
       {bursts.map((burst, index) => (
         <Animated.Text
           key={index}
-          style={[
-            styles.firework,
-            positions[index],
-            { opacity: burst.opacity, transform: [{ scale: burst.scale }] },
-          ]}
+          style={[styles.firework, positions[index], { opacity: burst.opacity, transform: [{ scale: burst.scale }] }]}
         >
           {positions[index].emoji}
         </Animated.Text>
@@ -277,32 +264,16 @@ function CollisionAnimation({
     const hitX = targetPoint.x - direction * 38;
 
     const animation = Animated.sequence([
-      Animated.timing(actorMove, {
-        duration: 420,
-        toValue: { x: hitX, y: targetPoint.y },
-        useNativeDriver: true,
-      }),
+      Animated.timing(actorMove, { duration: 420, toValue: { x: hitX, y: targetPoint.y }, useNativeDriver: true }),
       Animated.parallel([
-        Animated.timing(actorMove, {
-          duration: 90,
-          toValue: { x: targetPoint.x - direction * 8, y: targetPoint.y },
-          useNativeDriver: true,
-        }),
+        Animated.timing(actorMove, { duration: 90, toValue: { x: targetPoint.x - direction * 8, y: targetPoint.y }, useNativeDriver: true }),
         Animated.sequence([
           Animated.timing(targetMove, {
             duration: 80,
-            toValue: {
-              x: targetPoint.x + direction * (collision.kind === 'punch' ? 34 : 24),
-              y: targetPoint.y,
-            },
+            toValue: { x: targetPoint.x + direction * (collision.kind === 'punch' ? 34 : 24), y: targetPoint.y },
             useNativeDriver: true,
           }),
-          Animated.spring(targetMove, {
-            bounciness: 10,
-            speed: 20,
-            toValue: targetPoint,
-            useNativeDriver: true,
-          }),
+          Animated.spring(targetMove, { bounciness: 10, speed: 20, toValue: targetPoint, useNativeDriver: true }),
         ]),
         Animated.sequence([
           Animated.timing(targetRotate, { duration: 55, toValue: 1, useNativeDriver: true }),
@@ -332,22 +303,13 @@ function CollisionAnimation({
       <Animated.Text
         style={[
           styles.collisionImpact,
-          {
-            left: targetPoint.x + 46,
-            top: targetPoint.y + 15,
-            transform: [{ scale: impactScale }],
-          },
+          { left: targetPoint.x + 46, top: targetPoint.y + 15, transform: [{ scale: impactScale }] },
         ]}
       >
         {collision.kind === 'punch' ? '💥' : '💨'}
       </Animated.Text>
 
-      <Animated.View
-        style={[
-          styles.collisionMovingTarget,
-          { transform: [...targetMove.getTranslateTransform(), { rotate }] },
-        ]}
-      >
+      <Animated.View style={[styles.collisionMovingTarget, { transform: [...targetMove.getTranslateTransform(), { rotate }] }]}> 
         <AnimalCharacter
           animal={collision.target.animal}
           scaleMultiplier={1.5}
@@ -360,24 +322,30 @@ function CollisionAnimation({
   );
 }
 
-export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false, elapsedTime = '00:00', collision = null }: RoomSceneProps) {
+export function RoomScene({
+  me,
+  helpers,
+  myState,
+  task,
+  quote,
+  askingHelp = false,
+  finished = false,
+  elapsedTime = '00:00',
+  collision = null,
+}: RoomSceneProps) {
   const [sceneWidth, setSceneWidth] = useState(0);
   const [meDragOffset, setMeDragOffset] = useState({ x: 0, y: 0 });
+  const [roomBackground] = useState(() => pickRoomBackground());
 
   const resolveSpot = (participant: RoomCollision['actor'] | RoomCollision['target']) => {
     const isMe = participant.memberId === me.id || Boolean(participant.userId && participant.userId === me.userId);
     if (isMe) return { spot: ME_SPOT, offset: meDragOffset };
 
     const helperIndex = helpers.findIndex(
-      (member) =>
-        participant.memberId === member.id ||
-        Boolean(participant.userId && participant.userId === member.userId),
+      (member) => participant.memberId === member.id || Boolean(participant.userId && participant.userId === member.userId),
     );
 
-    return {
-      spot: helperIndex >= 0 ? SPOTS[helperIndex] : ME_SPOT,
-      offset: { x: 0, y: 0 },
-    };
+    return { spot: helperIndex >= 0 ? SPOTS[helperIndex] : ME_SPOT, offset: { x: 0, y: 0 } };
   };
 
   const toPoint = ({ spot, offset }: { spot: RoomSpot; offset: { x: number; y: number } }) => ({
@@ -391,13 +359,9 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
   return (
     <ImageBackground
       onLayout={(event) => setSceneWidth(event.nativeEvent.layout.width)}
-      source={ROOM_DAY_BACKGROUND}
+      source={roomBackground}
       resizeMode="cover"
-      style={[
-        styles.scene,
-        askingHelp && styles.sceneHelp,
-        finished && styles.sceneDone,
-      ]}
+      style={[styles.scene, askingHelp && styles.sceneHelp, finished && styles.sceneDone]}
     >
       <View style={styles.sceneShade} />
 
@@ -418,9 +382,16 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         forceHelp={askingHelp}
         quote={quote}
         controlsLocked={Boolean(collision) || finished}
-        hidden={Boolean(collision && (collision.actor.memberId === me.id || collision.target.memberId === me.id || collision.actor.userId === me.userId || collision.target.userId === me.userId))}
+        hidden={Boolean(
+          collision &&
+            (collision.actor.memberId === me.id ||
+              collision.target.memberId === me.id ||
+              collision.actor.userId === me.userId ||
+              collision.target.userId === me.userId),
+        )}
         onDragPositionChange={setMeDragOffset}
       />
+
       {helpers.slice(0, 5).map((member, index) => (
         <Worker
           key={member.id}
@@ -429,7 +400,13 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
           spot={SPOTS[index]}
           delay={index * 170 + 80}
           controlsLocked={Boolean(collision) || finished}
-          hidden={Boolean(collision && (collision.actor.memberId === member.id || collision.target.memberId === member.id || collision.actor.userId === member.userId || collision.target.userId === member.userId))}
+          hidden={Boolean(
+            collision &&
+              (collision.actor.memberId === member.id ||
+                collision.target.memberId === member.id ||
+                collision.actor.userId === member.userId ||
+                collision.target.userId === member.userId),
+          )}
           celebrationText={finished ? CELEBRATION_MESSAGES[index % CELEBRATION_MESSAGES.length] : undefined}
         />
       ))}
@@ -470,55 +447,33 @@ const styles = StyleSheet.create({
     top: 12,
     zIndex: 40,
   },
-  roomTimerText: {
-    color: '#5F4A3E',
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-    fontWeight: '900',
+  roomTimerText: { color: '#5F4A3E', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  sceneTitlePill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,249,243,0.91)',
+    borderRadius: 16,
+    left: '27%',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    position: 'absolute',
+    top: 177,
+    width: '46%',
   },
-  windowFrame: { backgroundColor: '#D9BFA9', borderColor: '#A98870', borderRadius: 20, borderWidth: 6, height: 150, left: 22, overflow: 'hidden', position: 'absolute', right: 22, top: 22 },
-  sky: { flex: 1, overflow: 'hidden', position: 'relative' },
-  daySky: { backgroundColor: '#BFE1F4' },
-  nightSky: { backgroundColor: '#263248' },
-  sun: { fontSize: 29, position: 'absolute', right: 23, top: 15 },
-  moon: { color: '#FFF1BA', fontSize: 34, position: 'absolute', right: 28, top: 12 },
-  starA: { color: '#FFF2B8', fontSize: 18, left: 36, position: 'absolute', top: 18 },
-  starB: { color: '#FFF2B8', fontSize: 26, left: 94, position: 'absolute', top: 35 },
-  skyline: { alignItems: 'flex-end', bottom: 0, flexDirection: 'row', gap: 3, left: 0, position: 'absolute', right: 0 },
-  building: { backgroundColor: '#49566B', flex: 1, minHeight: 24, position: 'relative' },
-  litWindow: { backgroundColor: '#FFD97B', height: 5, left: 4, position: 'absolute', top: 7, width: 4 },
-  windowBarV: { backgroundColor: '#A98870', bottom: 0, left: '49%', position: 'absolute', top: 0, width: 5 },
-  windowBarH: { backgroundColor: '#A98870', height: 5, left: 0, position: 'absolute', right: 0, top: '53%' },
-  curtainLeft: { backgroundColor: '#EAD4C4', borderBottomRightRadius: 22, bottom: 0, left: 0, opacity: 0.9, position: 'absolute', top: 0, width: 28 },
-  curtainRight: { backgroundColor: '#EAD4C4', borderBottomLeftRadius: 22, bottom: 0, opacity: 0.9, position: 'absolute', right: 0, top: 0, width: 28 },
-  wallPanelA: { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 40, height: 120, left: -30, position: 'absolute', top: 165, width: 150 },
-  wallPanelB: { backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 55, height: 150, position: 'absolute', right: -35, top: 150, width: 180 },
-  wallShelf: { backgroundColor: '#A97655', borderRadius: 8, left: 30, paddingHorizontal: 11, paddingVertical: 5, position: 'absolute', top: 187 },
-  shelfItems: { fontSize: 17 },
-  sideTable: { height: 62, position: 'absolute', right: 28, top: 200, width: 64 },
-  tableTop: { backgroundColor: '#9E6E4F', borderRadius: 8, height: 12, left: 0, position: 'absolute', right: 0, top: 0 },
-  tableLeg: { backgroundColor: '#855B43', borderRadius: 4, height: 52, left: 28, position: 'absolute', top: 9, width: 8 },
-  floorLamp: { height: 118, position: 'absolute', right: 26, top: 104, width: 62 },
-  lampShade: { backgroundColor: '#F4C98B', borderRadius: 18, height: 34, left: 7, position: 'absolute', top: 0, width: 48 },
-  lampPole: { backgroundColor: '#8A6652', height: 72, left: 29, position: 'absolute', top: 31, width: 5 },
-  lampBase: { backgroundColor: '#8A6652', borderRadius: 10, bottom: 0, height: 9, left: 17, position: 'absolute', width: 30 },
-  plantPot: { left: 18, position: 'absolute', top: 246 },
-  plantEmoji: { fontSize: 34 },
-  floor: { backgroundColor: '#B27F5F', bottom: 0, height: 250, left: 0, opacity: 0.95, position: 'absolute', right: 0 },
-  floorLineA: { backgroundColor: 'rgba(104,69,48,0.17)', bottom: 62, height: 2, left: 0, position: 'absolute', right: 0, transform: [{ rotate: '-5deg' }] },
-  floorLineB: { backgroundColor: 'rgba(104,69,48,0.14)', bottom: 132, height: 2, left: 0, position: 'absolute', right: 0, transform: [{ rotate: '4deg' }] },
-  floorLineC: { backgroundColor: 'rgba(104,69,48,0.12)', bottom: 202, height: 2, left: 0, position: 'absolute', right: 0 },
-  rug: { backgroundColor: '#E1C6AE', borderRadius: 120, bottom: 30, height: 150, left: '10%', opacity: 0.9, position: 'absolute', width: '80%' },
-  planks: { bottom: 20, position: 'absolute', right: 18 },
-  plankText: { fontSize: 23 },
-  sceneTitlePill: { alignItems: 'center', backgroundColor: 'rgba(255,249,243,0.91)', borderRadius: 16, left: '27%', paddingHorizontal: 13, paddingVertical: 7, position: 'absolute', top: 177, width: '46%' },
   sceneTitle: { color: '#6B5142', fontSize: 11, fontWeight: '900' },
   sceneTask: { color: '#917465', fontSize: 9, marginTop: 2 },
   worker: { alignItems: 'center', position: 'absolute', width: 150 },
   hiddenWorker: { opacity: 0 },
   draggableWorker: { zIndex: 20 },
   workerBubbleRow: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'center' },
-  namePill: { alignItems: 'center', backgroundColor: 'rgba(255,250,246,0.92)', borderRadius: 10, marginTop: 1, maxWidth: 84, paddingHorizontal: 6, paddingVertical: 3 },
+  namePill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,250,246,0.92)',
+    borderRadius: 10,
+    marginTop: 1,
+    maxWidth: 84,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
   meNamePill: { backgroundColor: '#FFF6E8' },
   nameText: { color: '#5F4A3E', fontSize: 9, fontWeight: '800' },
   npcTag: { color: '#947B6D', fontSize: 6, marginTop: 1 },
@@ -556,15 +511,7 @@ const styles = StyleSheet.create({
     zIndex: 35,
   },
   celebrationBubbleText: { color: '#76551E', fontSize: 10, fontWeight: '900', textAlign: 'center' },
-  celebrationLayer: {
-    bottom: 0,
-    left: 0,
-    pointerEvents: 'none',
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    zIndex: 70,
-  },
+  celebrationLayer: { bottom: 0, left: 0, pointerEvents: 'none', position: 'absolute', right: 0, top: 0, zIndex: 70 },
   firework: { fontSize: 36, position: 'absolute' },
   celebrationBanner: {
     alignItems: 'center',
@@ -580,14 +527,7 @@ const styles = StyleSheet.create({
     width: '52%',
   },
   celebrationBannerText: { color: '#6D4B18', fontSize: 14, fontWeight: '900', textAlign: 'center' },
-  collisionLayer: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    zIndex: 80,
-  },
+  collisionLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 80 },
   collisionMovingActor: { alignItems: 'center', left: 0, position: 'absolute', top: 0, width: 150 },
   collisionMovingTarget: { alignItems: 'center', left: 0, position: 'absolute', top: 0, width: 150 },
   collisionImpact: { fontSize: 28, position: 'absolute', zIndex: 10 },
@@ -601,6 +541,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  helpSign: { alignItems: 'center', backgroundColor: '#FFCFB8', borderRadius: 15, height: 30, justifyContent: 'center', left: '47%', position: 'absolute', top: 244, width: 30 },
+  helpSign: {
+    alignItems: 'center',
+    backgroundColor: '#FFCFB8',
+    borderRadius: 15,
+    height: 30,
+    justifyContent: 'center',
+    left: '47%',
+    position: 'absolute',
+    top: 244,
+    width: 30,
+  },
   helpSignText: { color: '#8B4B34', fontSize: 18, fontWeight: '900' },
 });
