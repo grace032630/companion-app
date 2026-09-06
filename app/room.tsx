@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { RoomScene, type RoomCollision } from '../components/RoomScene';
 import { ANIMAL_OPTIONS, CONSTRUCTION_ACTION_IDS, NAME_OPTIONS } from '../constants/crew';
+import { recordTaskCompletion } from '../lib/activity';
 import { useAuth } from '../lib/auth';
 import { useProfile } from '../lib/profile';
 import {
@@ -72,6 +73,7 @@ export default function RoomScreen(){
   const [elapsedSeconds,setElapsedSeconds]=useState(0);
   const roomEnteredAtRef=useRef(Date.now());
   const autoExitTriggeredRef=useRef(false);
+  const completionLoggedRef=useRef(false);
   const bgmPlayer=useAudioPlayer(require('../assets/audio/room-bgm.mp3'));
   const timersRef=useRef<ReturnType<typeof setTimeout>[]>([]);
   const roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);
@@ -138,7 +140,7 @@ export default function RoomScreen(){
   const supportUser=async(target:RoomSession,kind:SupportKind)=>{if(!roomId||!profile||!target.help_request_id)return;const {error}=await sendSupportEvent({roomId,requestId:target.help_request_id,targetUserId:target.user_id,kind,actorName:profile.nickname,actorAnimal:profile.animal});if(error){if(error.message.includes('Punch limit reached'))setNotice('同一個人最多揍兩下');else if(error.message.includes('Puncher limit reached'))setNotice('這次已經有四個人揍過了');else if(error.message.includes('no longer active'))setNotice(`${target.name} 已經開始做了`);else setNotice('剛剛沒送出去 再按一次');return;}playCollision({id:`local-${Date.now()}`,kind,actor:{animal:me.animal,name:me.name,userId:session?.user.id,memberId:'me'},target:{animal:target.animal,name:target.name,userId:target.user_id,memberId:target.id}});setNotice(kind==='push'?`你推了 ${target.name} 一把 👉`:`你揍了 ${target.name} 一下 👊`);};
   const supportBoardItem=(item:BoardItem,kind:SupportKind)=>{const target=liveSessions.find((sessionItem)=>sessionItem.user_id===item.targetUserId&&sessionItem.help_request_id===item.requestId);if(target)void supportUser(target,kind);};
   const confirmLeave=async()=>{const userId=session?.user.id;setLeaveOpen(false);clearTimers();if(userId)await leaveRoom(roomSessionIdRef.current,userId);router.replace('/');};
-  const finishTask=()=>{const userId=session?.user.id;if(finished||!userId)return;clearTimers();setHelpRequestId(null);setStatus('done');setSupportText(null);setSupportKind(null);setNotice('完成啦 大家幫你慶祝一下 🎉');timersRef.current.push(setTimeout(async()=>{await leaveRoom(roomSessionIdRef.current,userId);router.replace('/');},COMPLETE_EXIT_MS));};
+  const finishTask=()=>{const userId=session?.user.id;if(finished||!userId||completionLoggedRef.current)return;completionLoggedRef.current=true;clearTimers();setHelpRequestId(null);setStatus('done');setSupportText(null);setSupportKind(null);setNotice('完成啦 大家幫你慶祝一下 🎉');void recordTaskCompletion(userId,task);timersRef.current.push(setTimeout(async()=>{await leaveRoom(roomSessionIdRef.current,userId);router.replace('/');},COMPLETE_EXIT_MS));};
 
   if(!roomId&&!roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><ActivityIndicator color="#A86F4D" size="large"/><Text style={styles.loadingText}>正在幫你找施工房...</Text></View></SafeAreaView>;
   if(roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><Text style={styles.errorText}>{roomError}</Text><Pressable onPress={()=>router.replace('/')} style={styles.doneButton}><Text style={styles.doneText}>回首頁</Text></Pressable></View></SafeAreaView>;
