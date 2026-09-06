@@ -92,14 +92,14 @@ export default function RoomScreen(){
 
   useEffect(()=>{
     bgmPlayer.loop=true;
-    bgmPlayer.volume=0.22;
+    bgmPlayer.volume=0.45;
     if(bgmEnabled) bgmPlayer.play();
     else bgmPlayer.pause();
     return()=>{bgmPlayer.pause();};
   },[bgmEnabled,bgmPlayer]);
 
-  const animateSupport=(kind:SupportKind)=>{supportScale.setValue(0.9);setImpactState(kind==='push'?'pushed':'punched');Vibration.vibrate(kind==='push'?90:[0,70,100,70]);Animated.spring(supportScale,{bounciness:18,speed:23,toValue:1,useNativeDriver:true}).start();timersRef.current.push(setTimeout(()=>setImpactState(null),900));};
-  const playCollision=(nextCollision:RoomCollision)=>{setCollision(nextCollision);timersRef.current.push(setTimeout(()=>setCollision(null),1200));};
+  const animateSupport=(kind:SupportKind)=>{supportScale.setValue(0.9);setImpactState(kind==='push'?'pushed':'punched');Vibration.vibrate(kind==='push'?120:[0,90,100,120]);Animated.spring(supportScale,{bounciness:18,speed:23,toValue:1,useNativeDriver:true}).start();timersRef.current.push(setTimeout(()=>setImpactState(null),1800));};
+  const playCollision=(nextCollision:RoomCollision)=>{setCollision(nextCollision);timersRef.current.push(setTimeout(()=>setCollision(null),2200));};
   useEffect(()=>()=>clearTimers(),[]);
 
   useEffect(()=>{
