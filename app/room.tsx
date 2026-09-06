@@ -11,170 +11,73 @@ import { recordTaskCompletion } from '../lib/activity';
 import { useAuth } from '../lib/auth';
 import { useProfile } from '../lib/profile';
 import {
-  assignRoom,
-  fetchActiveRoomSessions,
-  heartbeatRoomSession,
-  joinRoom,
-  leaveRoom,
-  roomSessionToCrewMember,
-  sendSupportEvent,
-  subscribeToRoomSessions,
-  subscribeToSupportEvents,
-  updateRoomSession,
-  type RoomSession,
-  type RoomStatus,
-  type SupportKind,
+  assignRoom, broadcastRoomCompletion, fetchActiveRoomSessions, heartbeatRoomSession, joinRoom, leaveRoom,
+  roomSessionToCrewMember, sendSupportEvent, subscribeToRoomCompletions, subscribeToRoomSessions,
+  subscribeToSupportEvents, updateRoomSession, type RoomSession, type RoomStatus, type SupportKind,
 } from '../lib/room-realtime';
 import { supabase } from '../lib/supabase';
 import type { AnimalAnimationState, ConstructionActionId, CrewMember } from '../types/crew';
 
-const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '洗澡', '整理帳單', '回覆訊息', '其他事項'] as const;
-const SUPPORT_MESSAGES = ['欸 都進來了 就差真的動手了','手機先放下 去做一下啦','先碰它一下就好 不要想整件事','先做兩分鐘 不爽再回來','起來啦 先把第一個東西拿起來','現在就去 我在這裡等你','不要等有動力 動了再說','做爛也沒差 先做再說'];
-const ROOM_CAPACITY = 6;
-const HEARTBEAT_MS = 20_000;
-const COMPLETE_EXIT_MS = 7000;
-const ROOM_MAX_DURATION_MS = 24 * 60 * 60 * 1000;
-
-type Task = (typeof TASKS)[number];
-type BoardItem = { id:string; animal:string; name:string; text:string; kind:RoomStatus; helper:boolean; targetUserId?:string; requestId?:string|null };
-
-function pick<T>(items: readonly T[]): T { return items[Math.floor(Math.random() * items.length)]; }
-function shuffle<T>(items: readonly T[]): T[] { const copy=[...items]; for(let i=copy.length-1;i>0;i-=1){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];} return copy; }
-function isTask(value: unknown): value is Task { return typeof value === 'string' && TASKS.some((task)=>task===value); }
-function makeNpcPool(): CrewMember[] { const actions=shuffle(CONSTRUCTION_ACTION_IDS); return Array.from({length:ROOM_CAPACITY-1},(_,index)=>({id:`npc-${index+1}`,animal:pick(ANIMAL_OPTIONS),name:pick(NAME_OPTIONS),action:actions[index%actions.length],isMe:false,isNpc:true})); }
-function makeBoardItem(member:CrewMember,task:Task,kind:RoomStatus='working'):BoardItem { const text=kind==='done'?`完成了「${task}」 🎉`:kind==='help'?`做「${task}」卡住了，需要幫忙`:`正在做「${task}」`; return {id:member.id,animal:member.animal,name:member.name,text,kind,helper:Boolean(member.isNpc)}; }
-function makeSessionBoardItem(session:RoomSession):BoardItem { return {...makeBoardItem(roomSessionToCrewMember(session),isTask(session.task)?session.task:'其他事項',session.status),targetUserId:session.user_id,requestId:session.help_request_id}; }
-function boardState(kind:RoomStatus):AnimalAnimationState { return kind==='done'?'done':kind==='help'?'idle':'working'; }
-function RoomAnimal({animal,size,state}:{animal:string;size:number;state:AnimalAnimationState}) { return <AnimalCharacter animal={animal} size={size<=32?'small':'regular'} state={state}/>; }
+const TASKS=['打掃','寫報告','讀書','工作','運動','做家事','整理東西','洗澡','整理帳單','回覆訊息','其他事項'] as const;
+const SUPPORT_MESSAGES=['欸 都進來了 就差真的動手了','手機先放下 去做一下啦','先碰它一下就好 不要想整件事','先做兩分鐘 不爽再回來','起來啦 先把第一個東西拿起來','現在就去 我在這裡等你','不要等有動力 動了再說','做爛也沒差 先做再說'];
+const ROOM_CAPACITY=6, HEARTBEAT_MS=20_000, COMPLETE_EXIT_MS=3500, ROOM_MAX_DURATION_MS=24*60*60*1000;
+type Task=(typeof TASKS)[number];
+type BoardItem={id:string;animal:string;name:string;text:string;kind:RoomStatus;helper:boolean;targetUserId?:string;requestId?:string|null};
+function pick<T>(items:readonly T[]):T{return items[Math.floor(Math.random()*items.length)];}
+function shuffle<T>(items:readonly T[]):T[]{const copy=[...items];for(let i=copy.length-1;i>0;i-=1){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
+function isTask(value:unknown):value is Task{return typeof value==='string'&&TASKS.some((task)=>task===value);}
+function makeNpcPool():CrewMember[]{const actions=shuffle(CONSTRUCTION_ACTION_IDS);return Array.from({length:ROOM_CAPACITY-1},(_,index)=>({id:`npc-${index+1}`,animal:pick(ANIMAL_OPTIONS),name:pick(NAME_OPTIONS),action:actions[index%actions.length],isMe:false,isNpc:true}));}
+function makeBoardItem(member:CrewMember,task:Task,kind:RoomStatus='working'):BoardItem{const text=kind==='done'?`完成了「${task}」 🎉`:kind==='help'?`做「${task}」卡住了，需要幫忙`:`正在做「${task}」`;return{id:member.id,animal:member.animal,name:member.name,text,kind,helper:Boolean(member.isNpc)};}
+function makeSessionBoardItem(session:RoomSession):BoardItem{return{...makeBoardItem(roomSessionToCrewMember(session),isTask(session.task)?session.task:'其他事項',session.status),targetUserId:session.user_id,requestId:session.help_request_id};}
+function boardState(kind:RoomStatus):AnimalAnimationState{return kind==='done'?'done':kind==='help'?'idle':'working';}
+function RoomAnimal({animal,size,state}:{animal:string;size:number;state:AnimalAnimationState}){return <AnimalCharacter animal={animal} size={size<=32?'small':'regular'} state={state}/>;}
 
 export default function RoomScreen(){
-  const {session}=useAuth();
-  const {profile}=useProfile();
-  const params=useLocalSearchParams<{task?:string}>();
-  const task:Task=isTask(params.task)?params.task:'其他事項';
-  const [myAction]=useState<ConstructionActionId>(()=>pick(CONSTRUCTION_ACTION_IDS));
-  const [npcPool]=useState(makeNpcPool);
-  const [npcTasks]=useState<Task[]>(()=>shuffle(TASKS).slice(0,ROOM_CAPACITY-1));
-  const [roomId,setRoomId]=useState<string|null>(null);
-  const [roomError,setRoomError]=useState<string|null>(null);
-  const [liveSessions,setLiveSessions]=useState<RoomSession[]>([]);
-  const [status,setStatus]=useState<RoomStatus>('working');
-  const [helpRequestId,setHelpRequestId]=useState<string|null>(null);
-  const [boardOpen,setBoardOpen]=useState(false);
-  const [leaveOpen,setLeaveOpen]=useState(false);
-  const [supportIndex,setSupportIndex]=useState(()=>Math.floor(Math.random()*SUPPORT_MESSAGES.length));
-  const [notice,setNotice]=useState<string|null>(null);
-  const [supportText,setSupportText]=useState<string|null>(null);
-  const [supportKind,setSupportKind]=useState<SupportKind|null>(null);
-  const [impactState,setImpactState]=useState<'pushed'|'punched'|null>(null);
-  const [collision,setCollision]=useState<RoomCollision|null>(null);
-  const [supportScale]=useState(()=>new Animated.Value(0.92));
-  const [bgmEnabled,setBgmEnabled]=useState(true);
-  const [elapsedSeconds,setElapsedSeconds]=useState(0);
-  const roomEnteredAtRef=useRef(Date.now());
-  const autoExitTriggeredRef=useRef(false);
-  const completionLoggedRef=useRef(false);
-  const bgmPlayer=useAudioPlayer(require('../assets/audio/room-bgm.mp3'));
-  const timersRef=useRef<ReturnType<typeof setTimeout>[]>([]);
-  const roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);
-
-  const me=useMemo<CrewMember>(()=>({id:'me',action:myAction,animal:profile?.animal??'🐱',isMe:true,name:profile?.nickname??'你',userId:session?.user.id}),[myAction,profile?.animal,profile?.nickname,session?.user.id]);
-  const realHelpers=liveSessions.slice(0,ROOM_CAPACITY-1).map(roomSessionToCrewMember);
-  const npcHelpers=npcPool.slice(0,Math.max(0,ROOM_CAPACITY-1-realHelpers.length));
-  const helpers=[...realHelpers,...npcHelpers];
-  const askingHelp=status==='help';
-  const finished=status==='done';
-  const myAnimationState:AnimalAnimationState=finished?'done':impactState??(askingHelp?'idle':'working');
-  const helpRequests=liveSessions.filter((item)=>item.status==='help'&&item.help_request_id);
-  const board=[makeBoardItem(me,task,status),...liveSessions.slice(0,ROOM_CAPACITY-1).map(makeSessionBoardItem),...npcHelpers.map((member,index)=>makeBoardItem(member,npcTasks[index]??'其他事項'))].slice(0,ROOM_CAPACITY);
-
-  const clearTimers=()=>{timersRef.current.forEach(clearTimeout);timersRef.current=[];};
-
-  useEffect(()=>{
-    bgmPlayer.loop=true;
-    bgmPlayer.volume=0.45;
-    if(bgmEnabled) bgmPlayer.play();
-    else bgmPlayer.pause();
-    return()=>{bgmPlayer.pause();};
-  },[bgmEnabled,bgmPlayer]);
-
-  const animateSupport=(kind:SupportKind)=>{supportScale.setValue(0.9);setImpactState(kind==='push'?'pushed':'punched');Vibration.vibrate(kind==='push'?120:[0,90,100,120]);Animated.spring(supportScale,{bounciness:18,speed:23,toValue:1,useNativeDriver:true}).start();timersRef.current.push(setTimeout(()=>setImpactState(null),1800));};
-  const playCollision=(nextCollision:RoomCollision)=>{setCollision(nextCollision);timersRef.current.push(setTimeout(()=>setCollision(null),2200));};
-  useEffect(()=>()=>clearTimers(),[]);
-
-  useEffect(()=>{
-    const tick=()=>{
-      const elapsedMs=Date.now()-roomEnteredAtRef.current;
-      setElapsedSeconds(Math.floor(elapsedMs/1000));
-    };
-    tick();
-    const timer=setInterval(tick,1000);
-    return()=>clearInterval(timer);
-  },[]);
-
-  useEffect(()=>{
-    if(autoExitTriggeredRef.current)return;
-    if(elapsedSeconds*1000<ROOM_MAX_DURATION_MS)return;
-    const userId=session?.user.id;
-    if(!userId)return;
-    autoExitTriggeredRef.current=true;
-    clearTimers();
-    void leaveRoom(roomSessionIdRef.current,userId).finally(()=>router.replace('/'));
-  },[elapsedSeconds,session?.user.id]);
-
-  useEffect(()=>{const userId=session?.user.id;if(!userId||!profile)return;let active=true;void assignRoom(ROOM_CAPACITY).then((id)=>{if(active)setRoomId(id);}).catch((error:unknown)=>{if(active)setRoomError(error instanceof Error?error.message:'加入房間失敗');});return()=>{active=false;};},[profile,session?.user.id]);
-
-  useEffect(()=>{const userId=session?.user.id;if(!userId||!profile||!roomId)return;let active=true;let heartbeat:ReturnType<typeof setInterval>|null=null;let roomChannel:ReturnType<typeof subscribeToRoomSessions>|null=null;const roomSessionId=roomSessionIdRef.current;
-    const refresh=async()=>{try{const sessions=await fetchActiveRoomSessions(userId,roomId);if(active)setLiveSessions(sessions);}catch{if(active)setLiveSessions([]);}};
-    const connect=async()=>{const {error}=await joinRoom({id:roomSessionId,roomId,userId,name:me.name,animal:me.animal,task,status:'working',action:me.action});if(error||!active)return;await refresh();roomChannel=subscribeToRoomSessions(roomId,()=>void refresh());heartbeat=setInterval(()=>void heartbeatRoomSession(roomSessionId,userId),HEARTBEAT_MS);};
-    void connect();return()=>{active=false;if(heartbeat)clearInterval(heartbeat);if(roomChannel)void supabase.removeChannel(roomChannel);void leaveRoom(roomSessionId,userId);};
-  },[me.action,me.animal,me.name,profile,roomId,session?.user.id,task]);
-
-  useEffect(()=>{const userId=session?.user.id;if(!userId||!roomId)return;const channel=subscribeToSupportEvents(roomId,userId,(event)=>{clearTimers();setSupportKind(event.kind);setSupportText(event.kind==='push'?`${event.actor_name} 推你一把 👉`:`${event.actor_name} 揍了你一下 👊`);setSupportIndex(Math.floor(Math.random()*SUPPORT_MESSAGES.length));playCollision({id:event.id,kind:event.kind,actor:{animal:event.actor_animal,name:event.actor_name,userId:event.actor_user_id},target:{animal:me.animal,name:me.name,userId,memberId:'me'}});animateSupport(event.kind);});return()=>{void supabase.removeChannel(channel);};},[me.animal,me.name,roomId,session?.user.id]);
-
-  useEffect(()=>{const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{if(boardOpen){setBoardOpen(false);return true;}if(leaveOpen){setLeaveOpen(false);return true;}setLeaveOpen(true);return true;});return()=>subscription.remove();},[boardOpen,leaveOpen]);
-  useEffect(()=>{const userId=session?.user.id;if(!userId||!roomId)return;void updateRoomSession(roomSessionIdRef.current,userId,{status,task,help_request_id:status==='help'?helpRequestId:null});},[helpRequestId,roomId,session?.user.id,status,task]);
-
-  const askForHelp=()=>{if(askingHelp||finished)return;clearTimers();const requestId=`help-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;setHelpRequestId(requestId);setStatus('help');setNotice('已經喊幫我了 房間裡的人會看到');setSupportText(null);timersRef.current.push(setTimeout(()=>{const helper=npcPool[0];setSupportKind('push');setSupportText(`小幫手 ${helper.name} 推你一把 👉`);setSupportIndex(Math.floor(Math.random()*SUPPORT_MESSAGES.length));playCollision({id:`npc-${Date.now()}`,kind:'push',actor:{animal:helper.animal,name:helper.name,memberId:helper.id},target:{animal:me.animal,name:me.name,userId:session?.user.id,memberId:'me'}});animateSupport('push');},10000));};
-  const resumeWorking=()=>{clearTimers();setHelpRequestId(null);setStatus('working');setNotice('好 大家繼續一起施工');setSupportText(null);setSupportKind(null);setImpactState(null);setSupportIndex(Math.floor(Math.random()*SUPPORT_MESSAGES.length));};
-  const supportUser=async(target:RoomSession,kind:SupportKind)=>{if(!roomId||!profile||!target.help_request_id)return;const {error}=await sendSupportEvent({roomId,requestId:target.help_request_id,targetUserId:target.user_id,kind,actorName:profile.nickname,actorAnimal:profile.animal});if(error){if(error.message.includes('Punch limit reached'))setNotice('同一個人最多揍兩下');else if(error.message.includes('Puncher limit reached'))setNotice('這次已經有四個人揍過了');else if(error.message.includes('no longer active'))setNotice(`${target.name} 已經開始做了`);else setNotice('剛剛沒送出去 再按一次');return;}playCollision({id:`local-${Date.now()}`,kind,actor:{animal:me.animal,name:me.name,userId:session?.user.id,memberId:'me'},target:{animal:target.animal,name:target.name,userId:target.user_id,memberId:target.id}});setNotice(kind==='push'?`你推了 ${target.name} 一把 👉`:`你揍了 ${target.name} 一下 👊`);};
-  const supportBoardItem=(item:BoardItem,kind:SupportKind)=>{const target=liveSessions.find((sessionItem)=>sessionItem.user_id===item.targetUserId&&sessionItem.help_request_id===item.requestId);if(target)void supportUser(target,kind);};
-  const confirmLeave=async()=>{const userId=session?.user.id;setLeaveOpen(false);clearTimers();if(userId)await leaveRoom(roomSessionIdRef.current,userId);router.replace('/');};
-  const finishTask=()=>{const userId=session?.user.id;if(finished||!userId||completionLoggedRef.current)return;completionLoggedRef.current=true;clearTimers();setHelpRequestId(null);setStatus('done');setSupportText(null);setSupportKind(null);setNotice('完成啦 大家幫你慶祝一下 🎉');void recordTaskCompletion(userId,task);timersRef.current.push(setTimeout(async()=>{await leaveRoom(roomSessionIdRef.current,userId);router.replace('/');},COMPLETE_EXIT_MS));};
-
-  if(!roomId&&!roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><ActivityIndicator color="#A86F4D" size="large"/><Text style={styles.loadingText}>正在幫你找施工房...</Text></View></SafeAreaView>;
-  if(roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><Text style={styles.errorText}>{roomError}</Text><Pressable onPress={()=>router.replace('/')} style={styles.doneButton}><Text style={styles.doneText}>回首頁</Text></Pressable></View></SafeAreaView>;
-  const roomLabel=roomId?`施工房 ${roomId.slice(0,4).toUpperCase()}`:'施工房';
-  const elapsedMinutes=Math.floor(elapsedSeconds/60);
-  const elapsedDisplay=`${String(elapsedMinutes).padStart(2,'0')}:${String(elapsedSeconds%60).padStart(2,'0')}`;
-
-  return <SafeAreaView style={styles.safeArea}>
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><Pressable onPress={()=>setLeaveOpen(true)} style={styles.headerButton}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCenter}><Text style={styles.brand}>Companion</Text><Text style={styles.roomCode}>{roomLabel} · {helpers.length+1}/{ROOM_CAPACITY}</Text></View><View style={styles.headerActions}><Pressable onPress={()=>setBgmEnabled((value)=>!value)} style={styles.headerButton}><Text style={styles.soundIcon}>{bgmEnabled?'🔊':'🔇'}</Text></Pressable><Pressable onPress={()=>setBoardOpen(true)} style={styles.headerButton}><Text style={styles.boardIcon}>📌</Text></Pressable></View></View>
-
-      <RoomScene me={me} helpers={helpers} myState={myAnimationState} task={task} quote={profile?.quote} askingHelp={askingHelp} finished={finished} elapsedTime={elapsedDisplay} collision={collision}/>
-
-      {helpRequests.map((request)=><View key={request.id} style={styles.helpAlert}><View style={styles.helpAlertCopy}><RoomAnimal animal={request.animal} size={32} state="idle"/><View style={styles.helpAlertTextWrap}><Text style={styles.helpAlertTitle}>{request.name} 卡住了 🥺</Text><Text style={styles.helpAlertText}>正在做「{request.task}」</Text></View></View><View style={styles.helpAlertActions}><Pressable onPress={()=>void supportUser(request,'push')} style={styles.pushButton}><Text style={styles.pushButtonText}>推你一把 👉</Text></Pressable><Pressable onPress={()=>void supportUser(request,'punch')} style={styles.punchButton}><Text style={styles.punchButtonText}>揍一下 👊</Text></Pressable></View></View>)}
-
-      <View style={styles.supportBubble}><RoomAnimal animal={me.animal} size={32} state={myAnimationState}/><Text style={styles.supportMessage}>{finished?'靠 真的做完了欸':SUPPORT_MESSAGES[supportIndex]}</Text></View>
-      {supportText&&<Animated.View style={[styles.supportCard,supportKind==='punch'&&styles.punchCard,{transform:[{scale:supportScale}]}]}><Text style={styles.supportText}>{supportText}</Text></Animated.View>}
-      {notice&&<View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
-
-      {!finished?<View style={styles.actionsWrap}><Pressable onPress={askingHelp?resumeWorking:askForHelp} style={askingHelp?styles.resumeButton:styles.helpButton}><Text style={askingHelp?styles.resumeText:styles.helpText}>{askingHelp?'我開始做了':'幫我'}</Text></Pressable><Pressable onPress={finishTask} style={styles.doneButton}><Text style={styles.doneText}>完成任務 ✓</Text></Pressable></View>:<Text style={styles.exitHint}>慶祝一下 你等等會自動退出房間</Text>}
-    </ScrollView>
-
-    <Modal animationType="slide" onRequestClose={()=>setBoardOpen(false)} presentationStyle="pageSheet" visible={boardOpen}><SafeAreaView style={styles.boardSafeArea}><View style={styles.boardHeader}><View><Text style={styles.boardTitle}>📌 房間公告欄</Text><Text style={styles.boardSubtitle}>{roomLabel}</Text></View><Pressable onPress={()=>setBoardOpen(false)} style={styles.closeButton}><Text style={styles.closeText}>關閉</Text></Pressable></View><ScrollView contentContainerStyle={styles.boardList}>{board.map((item)=><View key={item.id} style={[styles.boardItem,item.kind==='help'&&styles.helpItem,item.kind==='done'&&styles.doneItem]}><RoomAnimal animal={item.animal} size={32} state={boardState(item.kind)}/><View style={styles.boardCopy}><View style={styles.nameRow}><Text style={styles.boardName}>{item.name}</Text>{item.helper&&<Text style={styles.boardHelperTag}>小幫手</Text>}</View><Text style={styles.boardText}>{item.text}</Text>{item.kind==='help'&&item.targetUserId&&item.requestId&&<View style={styles.boardActions}><Pressable onPress={()=>supportBoardItem(item,'push')} style={styles.boardActionButton}><Text style={styles.boardActionText}>推一把 👉</Text></Pressable><Pressable onPress={()=>supportBoardItem(item,'punch')} style={styles.boardPunchButton}><Text style={styles.boardPunchText}>揍一下 👊</Text></Pressable></View>}</View></View>)}</ScrollView></SafeAreaView></Modal>
-
-    <Modal animationType="fade" onRequestClose={()=>setLeaveOpen(false)} transparent visible={leaveOpen}><View style={styles.leaveOverlay}><View style={styles.leaveCard}><Text style={styles.leaveEmoji}>🚪</Text><Text style={styles.leaveTitle}>要離開施工房嗎？</Text><Text style={styles.leaveSubtitle}>離開後這次施工會停止</Text><View style={styles.leaveActions}><Pressable onPress={()=>setLeaveOpen(false)} style={styles.stayButton}><Text style={styles.stayText}>繼續施工</Text></Pressable><Pressable onPress={()=>void confirmLeave()} style={styles.leaveButton}><Text style={styles.leaveText}>離開</Text></Pressable></View></View></View></Modal>
-  </SafeAreaView>;
+ const {session}=useAuth();const {profile}=useProfile();const params=useLocalSearchParams<{task?:string}>();const task:Task=isTask(params.task)?params.task:'其他事項';
+ const [myAction]=useState<ConstructionActionId>(()=>pick(CONSTRUCTION_ACTION_IDS));const [npcPool]=useState(makeNpcPool);const [npcTasks]=useState<Task[]>(()=>shuffle(TASKS).slice(0,ROOM_CAPACITY-1));
+ const [roomId,setRoomId]=useState<string|null>(null),[roomError,setRoomError]=useState<string|null>(null),[liveSessions,setLiveSessions]=useState<RoomSession[]>([]),[status,setStatus]=useState<RoomStatus>('working'),[helpRequestId,setHelpRequestId]=useState<string|null>(null),[boardOpen,setBoardOpen]=useState(false),[leaveOpen,setLeaveOpen]=useState(false),[supportIndex,setSupportIndex]=useState(()=>Math.floor(Math.random()*SUPPORT_MESSAGES.length)),[notice,setNotice]=useState<string|null>(null),[supportText,setSupportText]=useState<string|null>(null),[supportKind,setSupportKind]=useState<SupportKind|null>(null),[impactState,setImpactState]=useState<'pushed'|'punched'|null>(null),[collision,setCollision]=useState<RoomCollision|null>(null),[supportScale]=useState(()=>new Animated.Value(0.92)),[bgmEnabled,setBgmEnabled]=useState(true),[elapsedSeconds,setElapsedSeconds]=useState(0);
+ const roomEnteredAtRef=useRef(Date.now()),autoExitTriggeredRef=useRef(false),completionLoggedRef=useRef(false),timersRef=useRef<ReturnType<typeof setTimeout>[]>([]),roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);const bgmPlayer=useAudioPlayer(require('../assets/audio/room-bgm.mp3'));
+ const me=useMemo<CrewMember>(()=>({id:'me',action:myAction,animal:profile?.animal??'🐱',isMe:true,name:profile?.nickname??'你',userId:session?.user.id}),[myAction,profile?.animal,profile?.nickname,session?.user.id]);
+ const realHelpers=liveSessions.slice(0,5).map(roomSessionToCrewMember),npcHelpers=npcPool.slice(0,Math.max(0,5-realHelpers.length)),helpers=[...realHelpers,...npcHelpers],askingHelp=status==='help',finished=status==='done',myAnimationState:AnimalAnimationState=finished?'done':impactState??(askingHelp?'idle':'working'),helpRequests=liveSessions.filter((item)=>item.status==='help'&&item.help_request_id),board=[makeBoardItem(me,task,status),...liveSessions.slice(0,5).map(makeSessionBoardItem),...npcHelpers.map((member,index)=>makeBoardItem(member,npcTasks[index]??'其他事項'))].slice(0,6);
+ const clearTimers=()=>{timersRef.current.forEach(clearTimeout);timersRef.current=[];};
+ useEffect(()=>{bgmPlayer.loop=true;bgmPlayer.volume=.45;bgmEnabled?bgmPlayer.play():bgmPlayer.pause();return()=>bgmPlayer.pause();},[bgmEnabled,bgmPlayer]);
+ const animateSupport=(kind:SupportKind)=>{supportScale.setValue(.9);setImpactState(kind==='push'?'pushed':'punched');Vibration.vibrate(kind==='push'?120:[0,90,100,120]);Animated.spring(supportScale,{bounciness:18,speed:23,toValue:1,useNativeDriver:true}).start();timersRef.current.push(setTimeout(()=>setImpactState(null),1800));};
+ const playCollision=(next:RoomCollision)=>{setCollision(next);timersRef.current.push(setTimeout(()=>setCollision(null),2200));};useEffect(()=>()=>clearTimers(),[]);
+ useEffect(()=>{const tick=()=>setElapsedSeconds(Math.floor((Date.now()-roomEnteredAtRef.current)/1000));tick();const timer=setInterval(tick,1000);return()=>clearInterval(timer);},[]);
+ useEffect(()=>{if(autoExitTriggeredRef.current||elapsedSeconds*1000<ROOM_MAX_DURATION_MS)return;const userId=session?.user.id;if(!userId)return;autoExitTriggeredRef.current=true;clearTimers();void leaveRoom(roomSessionIdRef.current,userId).finally(()=>router.replace('/'));},[elapsedSeconds,session?.user.id]);
+ useEffect(()=>{const userId=session?.user.id;if(!userId||!profile)return;let active=true;void assignRoom(6).then((id)=>{if(active)setRoomId(id);}).catch((e:unknown)=>{if(active)setRoomError(e instanceof Error?e.message:'加入房間失敗');});return()=>{active=false;};},[profile,session?.user.id]);
+ useEffect(()=>{const userId=session?.user.id;if(!userId||!profile||!roomId)return;let active=true;let heartbeat:ReturnType<typeof setInterval>|null=null;let roomChannel:ReturnType<typeof subscribeToRoomSessions>|null=null;const id=roomSessionIdRef.current;const refresh=async()=>{try{const rows=await fetchActiveRoomSessions(userId,roomId);if(active)setLiveSessions(rows);}catch{if(active)setLiveSessions([]);}};const connect=async()=>{const {error}=await joinRoom({id,roomId,userId,name:me.name,animal:me.animal,task,status:'working',action:me.action});if(error||!active)return;await refresh();roomChannel=subscribeToRoomSessions(roomId,()=>void refresh());heartbeat=setInterval(()=>void heartbeatRoomSession(id,userId),HEARTBEAT_MS);};void connect();return()=>{active=false;if(heartbeat)clearInterval(heartbeat);if(roomChannel)void supabase.removeChannel(roomChannel);void leaveRoom(id,userId);};},[me.action,me.animal,me.name,profile,roomId,session?.user.id,task]);
+ useEffect(()=>{const userId=session?.user.id;if(!userId||!roomId)return;const channel=subscribeToSupportEvents(roomId,userId,(event)=>{clearTimers();setSupportKind(event.kind);setSupportText(event.kind==='push'?`${event.actor_name} 推你一把 👉`:`${event.actor_name} 揍了你一下 👊`);setSupportIndex(Math.floor(Math.random()*SUPPORT_MESSAGES.length));playCollision({id:event.id,kind:event.kind,actor:{animal:event.actor_animal,name:event.actor_name,userId:event.actor_user_id},target:{animal:me.animal,name:me.name,userId,memberId:'me'}});animateSupport(event.kind);});return()=>{void supabase.removeChannel(channel);};},[me.animal,me.name,roomId,session?.user.id]);
+ useEffect(()=>{const userId=session?.user.id;if(!userId||!roomId)return;const channel=subscribeToRoomCompletions(roomId,(event)=>{if(event.user_id===userId)return;setLiveSessions((current)=>current.filter((item)=>item.user_id!==event.user_id));setNotice(`📣 ${event.name} 完成施工啦！`);Vibration.vibrate(100);});return()=>{void supabase.removeChannel(channel);};},[roomId,session?.user.id]);
+ useEffect(()=>{const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(boardOpen){setBoardOpen(false);return true;}if(leaveOpen){setLeaveOpen(false);return true;}setLeaveOpen(true);return true;});return()=>sub.remove();},[boardOpen,leaveOpen]);
+ useEffect(()=>{const userId=session?.user.id;if(!userId||!roomId||finished)return;void updateRoomSession(roomSessionIdRef.current,userId,{status,task,help_request_id:status==='help'?helpRequestId:null});},[finished,helpRequestId,roomId,session?.user.id,status,task]);
+ const askForHelp=()=>{if(askingHelp||finished)return;clearTimers();const requestId=`help-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;setHelpRequestId(requestId);setStatus('help');setNotice('已經喊幫我了 房間裡的人會看到');setSupportText(null);timersRef.current.push(setTimeout(()=>{const helper=npcPool[0];setSupportKind('push');setSupportText(`小幫手 ${helper.name} 推你一把 👉`);setSupportIndex(Math.floor(Math.random()*SUPPORT_MESSAGES.length));playCollision({id:`npc-${Date.now()}`,kind:'push',actor:{animal:helper.animal,name:helper.name,memberId:helper.id},target:{animal:me.animal,name:me.name,userId:session?.user.id,memberId:'me'}});animateSupport('push');},10000));};
+ const resumeWorking=()=>{clearTimers();setHelpRequestId(null);setStatus('working');setNotice('好 大家繼續一起施工');setSupportText(null);setSupportKind(null);setImpactState(null);setSupportIndex(Math.floor(Math.random()*SUPPORT_MESSAGES.length));};
+ const supportUser=async(target:RoomSession,kind:SupportKind)=>{if(!roomId||!profile||!target.help_request_id)return;const {error}=await sendSupportEvent({roomId,requestId:target.help_request_id,targetUserId:target.user_id,kind,actorName:profile.nickname,actorAnimal:profile.animal});if(error){setNotice(error.message.includes('Punch limit reached')?'同一個人最多揍兩下':error.message.includes('Puncher limit reached')?'這次已經有四個人揍過了':error.message.includes('no longer active')?`${target.name} 已經開始做了`:'剛剛沒送出去 再按一次');return;}playCollision({id:`local-${Date.now()}`,kind,actor:{animal:me.animal,name:me.name,userId:session?.user.id,memberId:'me'},target:{animal:target.animal,name:target.name,userId:target.user_id,memberId:target.id}});setNotice(kind==='push'?`你推了 ${target.name} 一把 👉`:`你揍了 ${target.name} 一下 👊`);};
+ const supportBoardItem=(item:BoardItem,kind:SupportKind)=>{const target=liveSessions.find((x)=>x.user_id===item.targetUserId&&x.help_request_id===item.requestId);if(target)void supportUser(target,kind);};
+ const confirmLeave=async()=>{const userId=session?.user.id;setLeaveOpen(false);clearTimers();if(userId)await leaveRoom(roomSessionIdRef.current,userId);router.replace('/');};
+ const finishTask=()=>{const userId=session?.user.id;if(finished||!userId||!roomId||completionLoggedRef.current)return;completionLoggedRef.current=true;clearTimers();setHelpRequestId(null);setStatus('done');setSupportText(null);setSupportKind(null);setNotice('完成啦 大家幫你慶祝一下 🎉');void recordTaskCompletion(userId,task);void broadcastRoomCompletion({roomId,userId,name:me.name,animal:me.animal,task});timersRef.current.push(setTimeout(async()=>{await leaveRoom(roomSessionIdRef.current,userId);router.replace('/');},COMPLETE_EXIT_MS));};
+ if(!roomId&&!roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><ActivityIndicator color="#A86F4D" size="large"/><Text style={styles.loadingText}>正在幫你找施工房...</Text></View></SafeAreaView>;
+ if(roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><Text style={styles.errorText}>{roomError}</Text><Pressable onPress={()=>router.replace('/')} style={styles.doneButton}><Text style={styles.doneText}>回首頁</Text></Pressable></View></SafeAreaView>;
+ const roomLabel=roomId?`施工房 ${roomId.slice(0,4).toUpperCase()}`:'施工房',elapsedMinutes=Math.floor(elapsedSeconds/60),elapsedDisplay=`${String(elapsedMinutes).padStart(2,'0')}:${String(elapsedSeconds%60).padStart(2,'0')}`;
+ return <SafeAreaView style={styles.safeArea}><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+  <View style={styles.header}><Pressable onPress={()=>setLeaveOpen(true)} style={styles.headerButton}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCenter}><Text style={styles.brand}>Companion</Text><Text style={styles.roomCode}>{roomLabel} · {helpers.length+1}/{ROOM_CAPACITY}</Text></View><View style={styles.headerActions}><Pressable onPress={()=>setBgmEnabled((v)=>!v)} style={styles.headerButton}><Text style={styles.soundIcon}>{bgmEnabled?'🔊':'🔇'}</Text></Pressable><Pressable onPress={()=>setBoardOpen(true)} style={styles.headerButton}><Text style={styles.boardIcon}>📌</Text></Pressable></View></View>
+  <RoomScene me={me} helpers={helpers} myState={myAnimationState} task={task} quote={profile?.quote} askingHelp={askingHelp} finished={finished} elapsedTime={elapsedDisplay} collision={collision}/>
+  {helpRequests.map((request)=><View key={request.id} style={styles.helpAlert}><View style={styles.helpAlertCopy}><RoomAnimal animal={request.animal} size={32} state="idle"/><View style={styles.helpAlertTextWrap}><Text style={styles.helpAlertTitle}>{request.name} 卡住了 🥺</Text><Text style={styles.helpAlertText}>正在做「{request.task}」</Text></View></View><View style={styles.helpAlertActions}><Pressable onPress={()=>void supportUser(request,'push')} style={styles.pushButton}><Text style={styles.pushButtonText}>推你一把 👉</Text></Pressable><Pressable onPress={()=>void supportUser(request,'punch')} style={styles.punchButton}><Text style={styles.punchButtonText}>揍一下 👊</Text></Pressable></View></View>)}
+  <View style={styles.supportBubble}><RoomAnimal animal={me.animal} size={32} state={myAnimationState}/><Text style={styles.supportMessage}>{finished?'靠 真的做完了欸':SUPPORT_MESSAGES[supportIndex]}</Text></View>{supportText&&<Animated.View style={[styles.supportCard,supportKind==='punch'&&styles.punchCard,{transform:[{scale:supportScale}]}]}><Text style={styles.supportText}>{supportText}</Text></Animated.View>}{notice&&<View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
+  {!finished?<View style={styles.actionsWrap}><Pressable onPress={askingHelp?resumeWorking:askForHelp} style={askingHelp?styles.resumeButton:styles.helpButton}><Text style={askingHelp?styles.resumeText:styles.helpText}>{askingHelp?'我開始做了':'幫我'}</Text></Pressable><Pressable onPress={finishTask} style={styles.doneButton}><Text style={styles.doneText}>完成任務 ✓</Text></Pressable></View>:<Text style={styles.exitHint}>慶祝一下 你等等會自動退出房間</Text>}
+ </ScrollView>
+ <Modal animationType="slide" onRequestClose={()=>setBoardOpen(false)} presentationStyle="pageSheet" visible={boardOpen}><SafeAreaView style={styles.boardSafeArea}><View style={styles.boardHeader}><View><Text style={styles.boardTitle}>📌 房間公告欄</Text><Text style={styles.boardSubtitle}>{roomLabel}</Text></View><Pressable onPress={()=>setBoardOpen(false)} style={styles.closeButton}><Text style={styles.closeText}>關閉</Text></Pressable></View><ScrollView contentContainerStyle={styles.boardList}>{board.map((item)=><View key={item.id} style={[styles.boardItem,item.kind==='help'&&styles.helpItem,item.kind==='done'&&styles.doneItem]}><RoomAnimal animal={item.animal} size={32} state={boardState(item.kind)}/><View style={styles.boardCopy}><View style={styles.nameRow}><Text style={styles.boardName}>{item.name}</Text>{item.helper&&<Text style={styles.boardHelperTag}>小幫手</Text>}</View><Text style={styles.boardText}>{item.text}</Text>{item.kind==='help'&&item.targetUserId&&item.requestId&&<View style={styles.boardActions}><Pressable onPress={()=>supportBoardItem(item,'push')} style={styles.boardActionButton}><Text style={styles.boardActionText}>推一把 👉</Text></Pressable><Pressable onPress={()=>supportBoardItem(item,'punch')} style={styles.boardPunchButton}><Text style={styles.boardPunchText}>揍一下 👊</Text></Pressable></View>}</View></View>)}</ScrollView></SafeAreaView></Modal>
+ <Modal animationType="fade" onRequestClose={()=>setLeaveOpen(false)} transparent visible={leaveOpen}><View style={styles.leaveOverlay}><View style={styles.leaveCard}><Text style={styles.leaveEmoji}>🚪</Text><Text style={styles.leaveTitle}>要離開施工房嗎？</Text><Text style={styles.leaveSubtitle}>離開後這次施工會停止</Text><View style={styles.leaveActions}><Pressable onPress={()=>setLeaveOpen(false)} style={styles.stayButton}><Text style={styles.stayText}>繼續施工</Text></Pressable><Pressable onPress={()=>void confirmLeave()} style={styles.leaveButton}><Text style={styles.leaveText}>離開</Text></Pressable></View></View></View></Modal>
+ </SafeAreaView>;
 }
 
 const styles=StyleSheet.create({
-  safeArea:{backgroundColor:'#F5E8DB',flex:1},content:{paddingBottom:34,paddingHorizontal:14,paddingTop:10},loadingWrap:{alignItems:'center',flex:1,gap:14,justifyContent:'center',padding:30},loadingText:{color:'#765C4D',fontSize:15,fontWeight:'700'},errorText:{color:'#A04F3B',fontSize:14,textAlign:'center'},
-  header:{alignItems:'center',flexDirection:'row',justifyContent:'space-between',paddingHorizontal:4},headerCenter:{alignItems:'center'},headerActions:{alignItems:'center',flexDirection:'row'},headerButton:{alignItems:'center',height:42,justifyContent:'center',width:42},backText:{color:'#5B493F',fontSize:36,lineHeight:38},brand:{color:'#493D34',fontSize:20,fontWeight:'900'},roomCode:{color:'#8E7567',fontSize:10,marginTop:2},soundIcon:{fontSize:18},boardIcon:{fontSize:20},
-  helpAlert:{backgroundColor:'#FFF0E8',borderColor:'#E3B99E',borderRadius:20,borderWidth:1,marginTop:12,padding:14},helpAlertCopy:{alignItems:'center',flexDirection:'row',gap:10},helpAlertTextWrap:{flex:1},helpAlertTitle:{color:'#744A34',fontSize:15,fontWeight:'900'},helpAlertText:{color:'#98705A',fontSize:12,marginTop:3},helpAlertActions:{flexDirection:'row',gap:8,marginTop:12},pushButton:{alignItems:'center',backgroundColor:'#FFFFFF',borderColor:'#D8B79F',borderRadius:13,borderWidth:1,flex:1,paddingVertical:10},pushButtonText:{color:'#744F39',fontSize:12,fontWeight:'800'},punchButton:{alignItems:'center',backgroundColor:'#FFD9CC',borderColor:'#D9957D',borderRadius:13,borderWidth:1,flex:1,paddingVertical:10},punchButtonText:{color:'#7A4333',fontSize:12,fontWeight:'900'},
-  supportBubble:{alignItems:'center',backgroundColor:'rgba(255,255,255,0.92)',borderColor:'#EDDED2',borderRadius:20,borderWidth:1,flexDirection:'row',gap:9,marginTop:12,padding:13},supportMessage:{color:'#5F4A3E',flex:1,fontSize:14,fontWeight:'700',lineHeight:20},supportCard:{backgroundColor:'#FFE3B8',borderColor:'#D6944D',borderRadius:18,borderWidth:2,marginTop:10,padding:14},punchCard:{backgroundColor:'#FFD8CB',borderColor:'#C96B54'},supportText:{color:'#5D3A20',fontSize:16,fontWeight:'900',textAlign:'center'},notice:{alignItems:'center',backgroundColor:'#F2D9C4',borderRadius:14,marginTop:10,padding:10},noticeText:{color:'#6E432C',fontSize:12,fontWeight:'700',textAlign:'center'},
-  actionsWrap:{flexDirection:'row',gap:10,marginTop:14},helpButton:{alignItems:'center',backgroundColor:'#FFFDFC',borderColor:'#D8C1B0',borderRadius:17,borderWidth:1,flex:1,justifyContent:'center',minHeight:56},helpText:{color:'#765C4D',fontSize:15,fontWeight:'900'},resumeButton:{alignItems:'center',backgroundColor:'#E7F1DF',borderColor:'#A7BF96',borderRadius:17,borderWidth:1,flex:1,justifyContent:'center',minHeight:56},resumeText:{color:'#506445',fontSize:15,fontWeight:'900'},doneButton:{alignItems:'center',alignSelf:'stretch',backgroundColor:'#A86F4D',borderRadius:17,flex:1.25,justifyContent:'center',minHeight:56,paddingHorizontal:18},doneText:{color:'#FFFFFF',fontSize:15,fontWeight:'900'},exitHint:{color:'#7C6A5E',fontSize:13,fontWeight:'700',marginTop:18,textAlign:'center'},
-  boardSafeArea:{backgroundColor:'#FFF9F1',flex:1},boardHeader:{alignItems:'center',borderBottomColor:'#EDDED2',borderBottomWidth:1,flexDirection:'row',justifyContent:'space-between',padding:24},boardTitle:{color:'#493D34',fontSize:23,fontWeight:'800'},boardSubtitle:{color:'#9A8171',fontSize:11,marginTop:4},closeButton:{backgroundColor:'#F2E3D7',borderRadius:14,paddingHorizontal:14,paddingVertical:9},closeText:{color:'#765C4D',fontSize:13,fontWeight:'700'},boardList:{gap:10,padding:20},boardItem:{alignItems:'center',backgroundColor:'#FFFFFF',borderColor:'#EDDED2',borderRadius:20,borderWidth:1,flexDirection:'row',gap:11,padding:15},helpItem:{backgroundColor:'#FFF0E8',borderColor:'#E3B99E'},doneItem:{backgroundColor:'#FFF8E7'},boardCopy:{flex:1},nameRow:{alignItems:'center',flexDirection:'row',gap:7},boardName:{color:'#55483E',fontSize:14,fontWeight:'800'},boardHelperTag:{backgroundColor:'#EFE3D8',borderRadius:8,color:'#8A6D5A',fontSize:9,overflow:'hidden',paddingHorizontal:6,paddingVertical:2},boardText:{color:'#806E62',fontSize:12,marginTop:3},boardActions:{flexDirection:'row',gap:7,marginTop:9},boardActionButton:{backgroundColor:'#FFFFFF',borderColor:'#D8B79F',borderRadius:10,borderWidth:1,paddingHorizontal:10,paddingVertical:7},boardActionText:{color:'#744F39',fontSize:11,fontWeight:'800'},boardPunchButton:{backgroundColor:'#FFD9CC',borderColor:'#D9957D',borderRadius:10,borderWidth:1,paddingHorizontal:10,paddingVertical:7},boardPunchText:{color:'#7A4333',fontSize:11,fontWeight:'900'},
-  leaveOverlay:{alignItems:'center',backgroundColor:'rgba(73,61,52,0.34)',flex:1,justifyContent:'center',padding:24},leaveCard:{alignItems:'center',backgroundColor:'#FFF9F1',borderRadius:26,maxWidth:360,padding:24,width:'100%'},leaveEmoji:{fontSize:30},leaveTitle:{color:'#493D34',fontSize:19,fontWeight:'900',marginTop:10},leaveSubtitle:{color:'#8F7768',fontSize:13,marginTop:7},leaveActions:{flexDirection:'row',gap:10,marginTop:22,width:'100%'},stayButton:{alignItems:'center',backgroundColor:'#F1E4D9',borderRadius:15,flex:1,justifyContent:'center',minHeight:50},stayText:{color:'#674F41',fontSize:14,fontWeight:'800'},leaveButton:{alignItems:'center',backgroundColor:'#A86F4D',borderRadius:15,flex:1,justifyContent:'center',minHeight:50},leaveText:{color:'#FFFFFF',fontSize:14,fontWeight:'900'}
+ safeArea:{backgroundColor:'#F5E8DB',flex:1},content:{paddingBottom:34,paddingHorizontal:14,paddingTop:10},loadingWrap:{alignItems:'center',flex:1,gap:14,justifyContent:'center',padding:30},loadingText:{color:'#765C4D',fontSize:15,fontWeight:'700'},errorText:{color:'#A04F3B',fontSize:14,textAlign:'center'},
+ header:{alignItems:'center',flexDirection:'row',justifyContent:'space-between',paddingHorizontal:4},headerCenter:{alignItems:'center'},headerActions:{alignItems:'center',flexDirection:'row'},headerButton:{alignItems:'center',height:42,justifyContent:'center',width:42},backText:{color:'#5B493F',fontSize:36,lineHeight:38},brand:{color:'#493D34',fontSize:20,fontWeight:'900'},roomCode:{color:'#8E7567',fontSize:10,marginTop:2},soundIcon:{fontSize:18},boardIcon:{fontSize:20},
+ helpAlert:{backgroundColor:'#FFF0E8',borderColor:'#E3B99E',borderRadius:20,borderWidth:1,marginTop:12,padding:14},helpAlertCopy:{alignItems:'center',flexDirection:'row',gap:10},helpAlertTextWrap:{flex:1},helpAlertTitle:{color:'#744A34',fontSize:15,fontWeight:'900'},helpAlertText:{color:'#98705A',fontSize:12,marginTop:3},helpAlertActions:{flexDirection:'row',gap:8,marginTop:12},pushButton:{alignItems:'center',backgroundColor:'#FFFFFF',borderColor:'#D8B79F',borderRadius:13,borderWidth:1,flex:1,paddingVertical:10},pushButtonText:{color:'#744F39',fontSize:12,fontWeight:'800'},punchButton:{alignItems:'center',backgroundColor:'#FFD9CC',borderColor:'#D9957D',borderRadius:13,borderWidth:1,flex:1,paddingVertical:10},punchButtonText:{color:'#7A4333',fontSize:12,fontWeight:'900'},
+ supportBubble:{alignItems:'center',backgroundColor:'rgba(255,255,255,.92)',borderColor:'#EDDED2',borderRadius:20,borderWidth:1,flexDirection:'row',gap:9,marginTop:12,padding:13},supportMessage:{color:'#5F4A3E',flex:1,fontSize:14,fontWeight:'700',lineHeight:20},supportCard:{backgroundColor:'#FFE3B8',borderColor:'#D6944D',borderRadius:18,borderWidth:2,marginTop:10,padding:14},punchCard:{backgroundColor:'#FFD8CB',borderColor:'#C96B54'},supportText:{color:'#5D3A20',fontSize:16,fontWeight:'900',textAlign:'center'},notice:{alignItems:'center',backgroundColor:'#F2D9C4',borderRadius:14,marginTop:10,padding:10},noticeText:{color:'#6E432C',fontSize:12,fontWeight:'700',textAlign:'center'},
+ actionsWrap:{flexDirection:'row',gap:10,marginTop:14},helpButton:{alignItems:'center',backgroundColor:'#FFFDFC',borderColor:'#D8C1B0',borderRadius:17,borderWidth:1,flex:1,justifyContent:'center',minHeight:56},helpText:{color:'#765C4D',fontSize:15,fontWeight:'900'},resumeButton:{alignItems:'center',backgroundColor:'#E7F1DF',borderColor:'#A7BF96',borderRadius:17,borderWidth:1,flex:1,justifyContent:'center',minHeight:56},resumeText:{color:'#506445',fontSize:15,fontWeight:'900'},doneButton:{alignItems:'center',alignSelf:'stretch',backgroundColor:'#A86F4D',borderRadius:17,flex:1.25,justifyContent:'center',minHeight:56,paddingHorizontal:18},doneText:{color:'#FFF',fontSize:15,fontWeight:'900'},exitHint:{color:'#7C6A5E',fontSize:13,fontWeight:'700',marginTop:18,textAlign:'center'},
+ boardSafeArea:{backgroundColor:'#FFF9F1',flex:1},boardHeader:{alignItems:'center',borderBottomColor:'#EDDED2',borderBottomWidth:1,flexDirection:'row',justifyContent:'space-between',padding:24},boardTitle:{color:'#493D34',fontSize:23,fontWeight:'800'},boardSubtitle:{color:'#9A8171',fontSize:11,marginTop:4},closeButton:{backgroundColor:'#F2E3D7',borderRadius:14,paddingHorizontal:14,paddingVertical:9},closeText:{color:'#765C4D',fontSize:13,fontWeight:'700'},boardList:{gap:10,padding:20},boardItem:{alignItems:'center',backgroundColor:'#FFF',borderColor:'#EDDED2',borderRadius:20,borderWidth:1,flexDirection:'row',gap:11,padding:15},helpItem:{backgroundColor:'#FFF0E8',borderColor:'#E3B99E'},doneItem:{backgroundColor:'#FFF8E7'},boardCopy:{flex:1},nameRow:{alignItems:'center',flexDirection:'row',gap:7},boardName:{color:'#55483E',fontSize:14,fontWeight:'800'},boardHelperTag:{backgroundColor:'#EFE3D8',borderRadius:8,color:'#8A6D5A',fontSize:9,overflow:'hidden',paddingHorizontal:6,paddingVertical:2},boardText:{color:'#806E62',fontSize:12,marginTop:3},boardActions:{flexDirection:'row',gap:7,marginTop:9},boardActionButton:{backgroundColor:'#FFF',borderColor:'#D8B79F',borderRadius:10,borderWidth:1,paddingHorizontal:10,paddingVertical:7},boardActionText:{color:'#744F39',fontSize:11,fontWeight:'800'},boardPunchButton:{backgroundColor:'#FFD9CC',borderColor:'#D9957D',borderRadius:10,borderWidth:1,paddingHorizontal:10,paddingVertical:7},boardPunchText:{color:'#7A4333',fontSize:11,fontWeight:'900'},
+ leaveOverlay:{alignItems:'center',backgroundColor:'rgba(73,61,52,.34)',flex:1,justifyContent:'center',padding:24},leaveCard:{alignItems:'center',backgroundColor:'#FFF9F1',borderRadius:26,maxWidth:360,padding:24,width:'100%'},leaveEmoji:{fontSize:30},leaveTitle:{color:'#493D34',fontSize:19,fontWeight:'900',marginTop:10},leaveSubtitle:{color:'#8F7768',fontSize:13,marginTop:7},leaveActions:{flexDirection:'row',gap:10,marginTop:22,width:'100%'},stayButton:{alignItems:'center',backgroundColor:'#F1E4D9',borderRadius:15,flex:1,justifyContent:'center',minHeight:50},stayText:{color:'#674F41',fontSize:14,fontWeight:'800'},leaveButton:{alignItems:'center',backgroundColor:'#A86F4D',borderRadius:15,flex:1,justifyContent:'center',minHeight:50},leaveText:{color:'#FFF',fontSize:14,fontWeight:'900'}
 });
