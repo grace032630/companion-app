@@ -9,4 +9,5 @@ export type CrewMember = {
   action: ConstructionActionId;
   isMe: boolean;
   isNpc?: boolean;
+  userId?: string;
 };
