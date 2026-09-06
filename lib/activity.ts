@@ -1,11 +1,13 @@
 import { supabase } from './supabase';
 
+export type TaskCompletion = { id: number; task: string; completed_at: string };
+
 export type ActivitySummary = {
   checkedInToday: boolean;
   streak: number;
   todayCompleted: number;
   weekCompleted: number;
-  recent: { id: number; task: string; completed_at: string }[];
+  recent: TaskCompletion[];
 };
 
 function toDateKey(date: Date) {
@@ -51,7 +53,7 @@ export async function fetchActivitySummary(userId: string): Promise<ActivitySumm
   ]);
 
   const checkins = (checkinsResult.data ?? []) as { checkin_date: string }[];
-  const completions = (completionsResult.data ?? []) as { id: number; task: string; completed_at: string }[];
+  const completions = (completionsResult.data ?? []) as TaskCompletion[];
   const checkinSet = new Set(checkins.map((item) => item.checkin_date));
 
   let streak = 0;
@@ -68,6 +70,20 @@ export async function fetchActivitySummary(userId: string): Promise<ActivitySumm
     streak,
     todayCompleted,
     weekCompleted: completions.length,
-    recent: completions.slice(0, 8),
+    recent: completions.slice(0, 5),
   };
+}
+
+export async function fetchActivityLogPage(userId: string, page = 0, pageSize = 30) {
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+  const { data, error } = await supabase
+    .from('task_completions')
+    .select('id,task,completed_at')
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw error;
+  return (data ?? []) as TaskCompletion[];
 }
