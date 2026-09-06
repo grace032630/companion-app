@@ -76,8 +76,6 @@ export function GrayCatActor({
     tailMotion.setValue(0);
     pawMotion.setValue(0);
 
-    if (state === 'help') return;
-
     const loops: Animated.CompositeAnimation[] = [
       Animated.loop(
         Animated.sequence([
@@ -93,12 +91,13 @@ export function GrayCatActor({
       ),
     ];
 
-    if (state === 'working') {
+    if (state === 'working' || state === 'help') {
+      const pawDuration = state === 'help' ? 210 : 280;
       loops.push(
         Animated.loop(
           Animated.sequence([
-            Animated.timing(pawMotion, { duration: 280, toValue: 1, useNativeDriver: true }),
-            Animated.timing(pawMotion, { duration: 280, toValue: 0, useNativeDriver: true }),
+            Animated.timing(pawMotion, { duration: pawDuration, toValue: 1, useNativeDriver: true }),
+            Animated.timing(pawMotion, { duration: pawDuration, toValue: 0, useNativeDriver: true }),
           ]),
         ),
       );
@@ -115,8 +114,14 @@ export function GrayCatActor({
 
   // The left/right paw files both face the same way. Mirror only the left one
   // so both paw tips point inward toward the cat's chest.
-  const leftPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['8deg', '18deg'] });
-  const rightPawRotate = pawMotion.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '-18deg'] });
+  const leftPawRotate = pawMotion.interpolate({
+    inputRange: [0, 1],
+    outputRange: state === 'help' ? ['-8deg', '18deg'] : ['8deg', '18deg'],
+  });
+  const rightPawRotate = pawMotion.interpolate({
+    inputRange: [0, 1],
+    outputRange: state === 'help' ? ['8deg', '-18deg'] : ['-8deg', '-18deg'],
+  });
 
   return (
     <View accessibilityLabel={`灰白貓，${state}`} style={[styles.canvas, { height: size, width: size }]}>
@@ -130,13 +135,10 @@ export function GrayCatActor({
         <Image resizeMode="contain" source={TAIL} style={styles.image} />
       </Animated.View>
 
-      <Animated.View style={[styles.part, scaledPlacement('body', scale), debugStyle('body', showDebug), { transform: [{ translateY: bodyY }] }]}>
-        <Image resizeMode="contain" source={BODY} style={styles.image} />
-      </Animated.View>
-
       <Animated.View
         style={[
           styles.part,
+          styles.pawPart,
           scaledPlacement('pawLeft', scale),
           debugStyle('pawLeft', showDebug),
           { transform: [{ scaleX: 1 }, { rotate: leftPawRotate }] },
@@ -148,15 +150,20 @@ export function GrayCatActor({
       <Animated.View
         style={[
           styles.part,
+          styles.pawPart,
           scaledPlacement('pawRight', scale),
           debugStyle('pawRight', showDebug),
-          { transform: [{ scaleX: -1 }, { rotate: rightPawRotate }] },          
+          { transform: [{ scaleX: -1 }, { rotate: rightPawRotate }] },
         ]}
       >
         <Image resizeMode="contain" source={PAW_RIGHT} style={styles.image} />
       </Animated.View>
 
-      <Animated.View style={[styles.part, scaledPlacement('head', scale), debugStyle('head', showDebug), { transform: [{ translateY: headY }] }]}>
+      <Animated.View style={[styles.part, styles.bodyPart, scaledPlacement('body', scale), debugStyle('body', showDebug), { transform: [{ translateY: bodyY }] }]}>
+        <Image resizeMode="contain" source={BODY} style={styles.image} />
+      </Animated.View>
+
+      <Animated.View style={[styles.part, styles.headPart, scaledPlacement('head', scale), debugStyle('head', showDebug), { transform: [{ translateY: headY }] }]}>
         <Image resizeMode="contain" source={HEAD} style={styles.image} />
 
         {state === 'help' ? (
@@ -190,33 +197,36 @@ export function GrayCatActor({
 const styles = StyleSheet.create({
   canvas: { position: 'relative' },
   part: { position: 'absolute' },
+  pawPart: { zIndex: 1 },
+  bodyPart: { zIndex: 2 },
+  headPart: { zIndex: 3 },
   image: { height: '100%', width: '100%' },
 
   // Open eyes are separate assets so eye spacing can be tuned without
   // stretching the eyeballs themselves.
   openEyeLeft: {
-    height: '24%',
-    left: '19%',
+    height: '20%',
+    left: '25%',
     position: 'absolute',
-    top: '40%',
-    width: '24%',
+    top: '34%',
+    width: '20%',
   },
   openEyeRight: {
-    height: '24%',
+    height: '20%',
     position: 'absolute',
-    right: '19%',
-    top: '40%',
-    width: '24%',
+    right: '25%',
+    top: '34%',
+    width: '20%',
   },
   // eyes_closed.png uses a small 160x160 calibration canvas. It needs to sit
   // lower on the face than before.
   closedEyes: {
-    height: '50%',
-    left: '13%',
+    height: '100%',
+    left: 0,
     position: 'absolute',
-    top: '30%',
-    transform: [{ scaleX: 3.32 }],
-    width: '74%',
+    top: '8%',
+    transform: [{ scaleX: 1.25 }],
+    width: '100%',
   },
 
   quoteBubble: {
