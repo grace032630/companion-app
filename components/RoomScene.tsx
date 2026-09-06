@@ -7,6 +7,13 @@ import { ConstructionAction } from './ConstructionAction';
 
 const ROOM_DAY_BACKGROUND = require('../assets/backgrounds/room-day.png');
 
+export type RoomCollision = {
+  id: string;
+  kind: 'push' | 'punch';
+  actor: { animal: string; name: string; userId?: string; memberId?: string };
+  target: { animal: string; name: string; userId?: string; memberId?: string };
+};
+
 type RoomSceneProps = {
   me: CrewMember;
   helpers: CrewMember[];
@@ -16,6 +23,7 @@ type RoomSceneProps = {
   askingHelp?: boolean;
   finished?: boolean;
   elapsedTime?: string;
+  collision?: RoomCollision | null;
 };
 
 const SPOTS = [
@@ -37,6 +45,8 @@ function Worker({
   delay = 0,
   forceHelp = false,
   quote,
+  controlsLocked = false,
+  hidden = false,
 }: {
   member: CrewMember;
   state?: AnimalAnimationState;
@@ -44,6 +54,8 @@ function Worker({
   delay?: number;
   forceHelp?: boolean;
   quote?: string | null;
+  controlsLocked?: boolean;
+  hidden?: boolean;
 }) {
   const [walk] = useState(() => new Animated.Value(0));
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -80,8 +92,8 @@ function Worker({
 
   const panResponder = useMemo(
     () => PanResponder.create({
-      onStartShouldSetPanResponder: () => Boolean(member.isMe),
-      onMoveShouldSetPanResponder: (_, gesture) => Boolean(member.isMe && (Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3)),
+      onStartShouldSetPanResponder: () => Boolean(member.isMe && !controlsLocked),
+      onMoveShouldSetPanResponder: (_, gesture) => Boolean(member.isMe && !controlsLocked && (Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3)),
       onPanResponderGrant: () => {
         dragStart.current = { ...dragCurrent.current };
       },
@@ -112,7 +124,7 @@ function Worker({
         }).start();
       },
     }),
-    [drag, member.isMe],
+    [controlsLocked, drag, member.isMe],
   );
 
   const driftX = walk.interpolate({ inputRange: [0, 1], outputRange: [-5, 6] });
@@ -124,6 +136,7 @@ function Worker({
       style={[
         styles.worker,
         member.isMe && styles.draggableWorker,
+        hidden && styles.hiddenWorker,
         {
           left: spot.left,
           top: spot.top,
@@ -158,7 +171,68 @@ function Worker({
   );
 }
 
-export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false, elapsedTime = '00:00' }: RoomSceneProps) {
+function CollisionAnimation({ collision }: { collision: RoomCollision }) {
+  const [actorX] = useState(() => new Animated.Value(collision.actor.name === collision.target.name ? -90 : -115));
+  const [targetX] = useState(() => new Animated.Value(0));
+  const [impactScale] = useState(() => new Animated.Value(0));
+  const [targetRotate] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    actorX.setValue(-115);
+    targetX.setValue(0);
+    impactScale.setValue(0);
+    targetRotate.setValue(0);
+
+    const animation = Animated.sequence([
+      Animated.parallel([
+        Animated.timing(actorX, { duration: 330, toValue: -18, useNativeDriver: true }),
+        Animated.timing(impactScale, { duration: 330, toValue: 0.2, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.spring(actorX, { bounciness: 14, speed: 22, toValue: -6, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(targetX, { duration: 80, toValue: collision.kind === 'punch' ? 34 : 24, useNativeDriver: true }),
+          Animated.spring(targetX, { bounciness: 12, speed: 20, toValue: 0, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(targetRotate, { duration: 55, toValue: 1, useNativeDriver: true }),
+          Animated.timing(targetRotate, { duration: 55, toValue: -1, useNativeDriver: true }),
+          Animated.timing(targetRotate, { duration: 55, toValue: 0, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(impactScale, { duration: 70, toValue: 1.25, useNativeDriver: true }),
+          Animated.spring(impactScale, { bounciness: 15, speed: 20, toValue: 1, useNativeDriver: true }),
+        ]),
+      ]),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [actorX, collision.id, collision.kind, impactScale, targetRotate, targetX]);
+
+  const rotate = targetRotate.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-8deg', '0deg', '8deg'] });
+
+  return (
+    <View pointerEvents="none" style={styles.collisionLayer}>
+      <View style={styles.collisionStage}>
+        <Animated.View style={[styles.collisionActor, { transform: [{ translateX: actorX }] }]}>
+          <AnimalCharacter animal={collision.actor.animal} scaleMultiplier={1.5} size="regular" state="working" />
+          <Text style={styles.collisionName}>{collision.actor.name}</Text>
+        </Animated.View>
+
+        <Animated.Text style={[styles.collisionImpact, { transform: [{ scale: impactScale }] }]}>
+          {collision.kind === 'punch' ? '💥' : '💨'}
+        </Animated.Text>
+
+        <Animated.View style={[styles.collisionTarget, { transform: [{ translateX: targetX }, { rotate }] }]}>
+          <AnimalCharacter animal={collision.target.animal} scaleMultiplier={1.5} size="regular" state={collision.kind === 'punch' ? 'punched' : 'pushed'} />
+          <Text style={styles.collisionName}>{collision.target.name}</Text>
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
+
+export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false, elapsedTime = '00:00', collision = null }: RoomSceneProps) {
   return (
     <ImageBackground
       source={ROOM_DAY_BACKGROUND}
@@ -180,11 +254,28 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         <Text style={styles.sceneTask}>{task}</Text>
       </View>
 
-      <Worker member={me} state={myState} spot={{ left: '30%', top: 275 }} delay={120} forceHelp={askingHelp} quote={quote} />
+      <Worker
+        member={me}
+        state={myState}
+        spot={{ left: '30%', top: 275 }}
+        delay={120}
+        forceHelp={askingHelp}
+        quote={quote}
+        controlsLocked={Boolean(collision)}
+        hidden={Boolean(collision && (collision.actor.memberId === me.id || collision.target.memberId === me.id || collision.actor.userId === me.userId || collision.target.userId === me.userId))}
+      />
       {helpers.slice(0, 5).map((member, index) => (
-        <Worker key={member.id} member={member} spot={SPOTS[index]} delay={index * 170 + 80} />
+        <Worker
+          key={member.id}
+          member={member}
+          spot={SPOTS[index]}
+          delay={index * 170 + 80}
+          controlsLocked={Boolean(collision)}
+          hidden={Boolean(collision && (collision.actor.memberId === member.id || collision.target.memberId === member.id || collision.actor.userId === member.userId || collision.target.userId === member.userId))}
+        />
       ))}
 
+      {collision ? <CollisionAnimation collision={collision} /> : null}
       {askingHelp && <View style={styles.helpSign}><Text style={styles.helpSignText}>！</Text></View>}
     </ImageBackground>
   );
@@ -262,6 +353,7 @@ const styles = StyleSheet.create({
   sceneTitle: { color: '#6B5142', fontSize: 11, fontWeight: '900' },
   sceneTask: { color: '#917465', fontSize: 9, marginTop: 2 },
   worker: { alignItems: 'center', position: 'absolute', width: 150 },
+  hiddenWorker: { opacity: 0 },
   draggableWorker: { zIndex: 20 },
   workerBubbleRow: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'center' },
   namePill: { alignItems: 'center', backgroundColor: 'rgba(255,250,246,0.92)', borderRadius: 10, marginTop: 1, maxWidth: 84, paddingHorizontal: 6, paddingVertical: 3 },
@@ -286,6 +378,37 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   followQuoteText: { color: '#6B5548', fontSize: 10, lineHeight: 14, textAlign: 'center' },
+  collisionLayer: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 80,
+  },
+  collisionStage: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    height: 130,
+    justifyContent: 'center',
+    position: 'relative',
+    width: 260,
+  },
+  collisionActor: { alignItems: 'center', position: 'absolute', left: 78 },
+  collisionTarget: { alignItems: 'center', position: 'absolute', right: 58 },
+  collisionImpact: { fontSize: 28, position: 'absolute', zIndex: 10 },
+  collisionName: {
+    backgroundColor: 'rgba(255,250,246,0.94)',
+    borderRadius: 8,
+    color: '#5F4A3E',
+    fontSize: 8,
+    fontWeight: '800',
+    marginTop: -2,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
   helpSign: { alignItems: 'center', backgroundColor: '#FFCFB8', borderRadius: 15, height: 30, justifyContent: 'center', left: '47%', position: 'absolute', top: 244, width: 30 },
   helpSignText: { color: '#8B4B34', fontSize: 18, fontWeight: '900' },
 });
