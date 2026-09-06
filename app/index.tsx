@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { useProfile } from '../lib/profile';
 
-const TASKS = ['打掃房間', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '其他事項'];
+const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '洗澡', '整理帳單', '回覆訊息', '其他事項'];
 
 export default function HomeScreen() {
   const { profile, loading: profileLoading } = useProfile();
