@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Animated, ImageBackground, PanResponder, StyleSheet, Text, View } from 'react-native';
 
 import type { AnimalAnimationState, CrewMember } from '../types/crew';
 import { AnimalCharacter } from './AnimalCharacter';
@@ -156,71 +156,13 @@ function Worker({
 }
 
 export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false }: RoomSceneProps) {
-  const hour = new Date().getHours();
-  const isNight = hour < 6 || hour >= 18;
-  const [glow] = useState(() => new Animated.Value(0.35));
-  const [curtain] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    const glowAnim = Animated.loop(Animated.sequence([
-      Animated.timing(glow, { duration: 1700, toValue: 0.8, useNativeDriver: true }),
-      Animated.timing(glow, { duration: 1700, toValue: 0.35, useNativeDriver: true }),
-    ]));
-    const curtainAnim = Animated.loop(Animated.sequence([
-      Animated.timing(curtain, { duration: 2300, toValue: 1, useNativeDriver: true }),
-      Animated.timing(curtain, { duration: 2300, toValue: 0, useNativeDriver: true }),
-    ]));
-    glowAnim.start();
-    curtainAnim.start();
-    return () => {
-      glowAnim.stop();
-      curtainAnim.stop();
-    };
-  }, [curtain, glow]);
-
-  const skyline = useMemo(
-    () => Array.from({ length: 13 }, (_, i) => ({ h: 25 + ((i * 17) % 48), lit: i % 3 !== 0 })),
-    [],
-  );
-  const curtainX = curtain.interpolate({ inputRange: [0, 1], outputRange: [-2, 3] });
-
   return (
-    <View style={[styles.scene, isNight ? styles.sceneNight : styles.sceneDay, askingHelp && styles.sceneHelp, finished && styles.sceneDone]}>
-      <View style={styles.windowFrame}>
-        <View style={[styles.sky, isNight ? styles.nightSky : styles.daySky]}>
-          {isNight ? (
-            <>
-              <Text style={styles.moon}>☾</Text>
-              <Animated.Text style={[styles.starA, { opacity: glow }]}>✦</Animated.Text>
-              <Animated.Text style={[styles.starB, { opacity: glow }]}>·</Animated.Text>
-            </>
-          ) : <Text style={styles.sun}>☀</Text>}
-          <View style={styles.skyline}>
-            {skyline.map((b, i) => (
-              <View key={i} style={[styles.building, { height: b.h }]}>
-                {isNight && b.lit && <View style={styles.litWindow} />}
-              </View>
-            ))}
-          </View>
-        </View>
-        <View style={styles.windowBarV} />
-        <View style={styles.windowBarH} />
-        <Animated.View style={[styles.curtainLeft, { transform: [{ translateX: curtainX }] }]} />
-        <Animated.View style={[styles.curtainRight, { transform: [{ translateX: Animated.multiply(curtainX, -1) }] }]} />
-      </View>
-
-      <View style={styles.wallPanelA} />
-      <View style={styles.wallPanelB} />
-      <View style={styles.wallShelf}><Text style={styles.shelfItems}>📚  🪴  🕯️</Text></View>
-      <View style={styles.sideTable}><View style={styles.tableTop} /><View style={styles.tableLeg} /></View>
-      <View style={styles.floorLamp}><View style={styles.lampShade} /><View style={styles.lampPole} /><View style={styles.lampBase} /></View>
-      <View style={styles.plantPot}><Text style={styles.plantEmoji}>🪴</Text></View>
-      <View style={styles.floor} />
-      <View style={styles.floorLineA} />
-      <View style={styles.floorLineB} />
-      <View style={styles.floorLineC} />
-      <View style={styles.rug} />
-      <View style={styles.planks}><Text style={styles.plankText}>🪵  🪵</Text></View>
+    <ImageBackground
+      source={require('../assets/backgrounds/room-day.png')}
+      resizeMode="cover"
+      style={[styles.scene, askingHelp && styles.sceneHelp, finished && styles.sceneDone]}
+    >
+      <View style={styles.sceneShade} />
 
       <View style={styles.sceneTitlePill}>
         <Text style={styles.sceneTitle}>{finished ? '施工完成 ✨' : askingHelp ? '先卡一下 會有人來' : '大家正在施工'}</Text>
@@ -233,14 +175,13 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
       ))}
 
       {askingHelp && <View style={styles.helpSign}><Text style={styles.helpSignText}>！</Text></View>}
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   scene: { borderRadius: 28, height: 610, marginTop: 16, overflow: 'hidden', position: 'relative' },
-  sceneDay: { backgroundColor: '#F7E8D8' },
-  sceneNight: { backgroundColor: '#3F4559' },
+  sceneShade: { backgroundColor: 'rgba(53,35,23,0.04)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   sceneHelp: { borderColor: '#E19B78', borderWidth: 2 },
   sceneDone: { borderColor: '#E2C66A', borderWidth: 2 },
   windowFrame: { backgroundColor: '#D9BFA9', borderColor: '#A98870', borderRadius: 20, borderWidth: 6, height: 150, left: 22, overflow: 'hidden', position: 'absolute', right: 22, top: 22 },
