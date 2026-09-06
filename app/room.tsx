@@ -20,7 +20,29 @@ import { supabase } from '../lib/supabase';
 import type { AnimalAnimationState, ConstructionActionId, CrewMember } from '../types/crew';
 
 const TASKS=['打掃','寫報告','讀書','工作','運動','做家事','整理東西','洗澡','整理帳單','回覆訊息','其他事項'] as const;
-const SUPPORT_MESSAGES=['欸~~都進來了~就差真的動手了！','手機先放下 去做一下啦！','先碰它一下就好 不要想整件事','先做兩分鐘 不爽再回來！','起來啦！先把第一個東西拿起來','現在就去 我在這裡等你！','不要等有動力 動了再說','做爛也沒差 先做再說！'];
+const SUPPORT_MESSAGES=[
+  '欸~~都進來了~就差真的動手了！',
+  '手機先放下 現在就行動',
+  '先碰它一下就好 不要想整件事',
+  '先做兩分鐘嘛~~試試看',
+  '起來啦！先做第一步~~',
+  '現在就去 我在這裡等你！',
+  '不要等有動力 動了再說',
+  '先做再說！想一千次~不如努力的去試一次',
+  '有自信地朝你的夢想前進，過你想像中的生活',
+  '今天要做一些未來的你會感謝自己的事~',
+  '今天的我沒有極限',
+  '最佳的報復是巨大的成功',
+  '開始的方法就是停止空談並開始行動',
+  'Actions speak louder than words',
+  '我絕對不會放棄我自己 沒有你想像中困難',
+  '行動是治癒恐懼的良藥',
+  '手機裡的每一分鐘，都是你用現實人生的意義換來的',
+  '現在，站起來去喝一杯水',
+  '把螢幕按熄，扣在桌上',
+  '出門！出門！看看這世界！',
+  '你滑掉的是時間，消耗的是你的人生',
+];
 const ROOM_CAPACITY=6, HEARTBEAT_MS=20_000, COMPLETE_EXIT_MS=3500, ROOM_MAX_DURATION_MS=24*60*60*1000, COMPLETION_NOTICE_MS=3000, COLLISION_MS=2200;
 type Task=(typeof TASKS)[number];
 type BoardItem={id:string;animal:string;name:string;text:string;kind:RoomStatus;helper:boolean;targetUserId?:string;requestId?:string|null};
@@ -70,7 +92,7 @@ export default function RoomScreen(){
   <View style={styles.header}><Pressable onPress={()=>setLeaveOpen(true)} style={styles.headerButton}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCenter}><Text style={styles.brand}>Companion</Text><Text style={styles.roomCode}>{roomLabel} · {helpers.length+1}/{ROOM_CAPACITY}</Text></View><View style={styles.headerActions}><Pressable onPress={()=>setBgmEnabled((v)=>!v)} style={styles.headerButton}><Text style={styles.soundIcon}>{bgmEnabled?'🔊':'🔇'}</Text></Pressable><Pressable onPress={()=>setBoardOpen(true)} style={styles.headerButton}><Text style={styles.boardIcon}>📌</Text></Pressable></View></View>
   <RoomScene me={me} helpers={helpers} myState={myAnimationState} task={task} quote={profile?.quote} askingHelp={askingHelp} finished={finished} elapsedTime={elapsedDisplay} collision={collision}/>
   {helpRequests.map((request)=><View key={request.id} style={styles.helpAlert}><View style={styles.helpAlertCopy}><RoomAnimal animal={request.animal} size={32} state="idle"/><View style={styles.helpAlertTextWrap}><Text style={styles.helpAlertTitle}>{request.name} 卡住了 🥺</Text><Text style={styles.helpAlertText}>正在做「{request.task}」</Text></View></View><View style={styles.helpAlertActions}><Pressable onPress={()=>void supportUser(request,'push')} style={styles.pushButton}><Text style={styles.pushButtonText}>推你一把 👉</Text></Pressable><Pressable onPress={()=>void supportUser(request,'punch')} style={styles.punchButton}><Text style={styles.punchButtonText}>揍一下 👊</Text></Pressable></View></View>)}
-  <View style={styles.supportBubble}><RoomAnimal animal={me.animal} size={32} state={myAnimationState}/><Text style={styles.supportMessage}>{finished?'靠！真的做完了欸！':SUPPORT_MESSAGES[supportIndex]}</Text></View>{supportText&&<Animated.View style={[styles.supportCard,supportKind==='punch'&&styles.punchCard,{transform:[{scale:supportScale}]}]}><Text style={styles.supportText}>{supportText}</Text></Animated.View>}{completionNotice&&<View style={styles.completionNotice}><Text style={styles.completionNoticeText}>{completionNotice}</Text></View>}{notice&&<View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
+  <View style={styles.supportBubble}><RoomAnimal animal={me.animal} size={32} state={myAnimationState}/><Text style={styles.supportMessage}>{finished?'真的做完了欸！':SUPPORT_MESSAGES[supportIndex]}</Text></View>{supportText&&<Animated.View style={[styles.supportCard,supportKind==='punch'&&styles.punchCard,{transform:[{scale:supportScale}]}]}><Text style={styles.supportText}>{supportText}</Text></Animated.View>}{completionNotice&&<View style={styles.completionNotice}><Text style={styles.completionNoticeText}>{completionNotice}</Text></View>}{notice&&<View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
   {!finished?<View style={styles.actionsWrap}><Pressable onPress={askingHelp?resumeWorking:askForHelp} style={askingHelp?styles.resumeButton:styles.helpButton}><Text style={askingHelp?styles.resumeText:styles.helpText}>{askingHelp?'我開始做了':'幫我'}</Text></Pressable><Pressable onPress={finishTask} style={styles.doneButton}><Text style={styles.doneText}>完成任務 ✓</Text></Pressable></View>:<Text style={styles.exitHint}>慶祝一下~等等會自動退出房間！</Text>}
  </ScrollView>
  <Modal animationType="slide" onRequestClose={()=>setBoardOpen(false)} presentationStyle="pageSheet" visible={boardOpen}><SafeAreaView style={styles.boardSafeArea}><View style={styles.boardHeader}><View><Text style={styles.boardTitle}>📌 房間公告欄</Text><Text style={styles.boardSubtitle}>{roomLabel}</Text></View><Pressable onPress={()=>setBoardOpen(false)} style={styles.closeButton}><Text style={styles.closeText}>關閉</Text></Pressable></View><ScrollView contentContainerStyle={styles.boardList}>{board.map((item)=><View key={item.id} style={[styles.boardItem,item.kind==='help'&&styles.helpItem,item.kind==='done'&&styles.doneItem]}><RoomAnimal animal={item.animal} size={32} state={boardState(item.kind)}/><View style={styles.boardCopy}><View style={styles.nameRow}><Text style={styles.boardName}>{item.name}</Text>{item.helper&&<Text style={styles.boardHelperTag}>小幫手</Text>}</View><Text style={styles.boardText}>{item.text}</Text>{item.kind==='help'&&item.targetUserId&&item.requestId&&<View style={styles.boardActions}><Pressable onPress={()=>supportBoardItem(item,'push')} style={styles.boardActionButton}><Text style={styles.boardActionText}>推一把 👉</Text></Pressable><Pressable onPress={()=>supportBoardItem(item,'punch')} style={styles.boardPunchButton}><Text style={styles.boardPunchText}>揍一下 👊</Text></Pressable></View>}</View></View>)}</ScrollView></SafeAreaView></Modal>
