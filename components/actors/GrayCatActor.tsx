@@ -186,21 +186,21 @@ const styles = StyleSheet.create({
   // eyes_open.png was generated on a full 1254x1254 canvas. If stretched to
   // the whole head the eyes become huge. Shrink the whole overlay and center it.
   openEyes: {
-    height: '32%',
+    height: '50%',
     left: '16%',
     position: 'absolute',
     top: '26%',
-    transform: [{ scaleX: 1.26 }],
+    transform: [{ scaleX: 2.26 }],
     width: '68%',
   },
   // eyes_closed.png uses a small 160x160 calibration canvas. It needs to sit
   // lower on the face than before.
   closedEyes: {
-    height: '30%',
+    height: '50%',
     left: '13%',
     position: 'absolute',
-    top: '27%',
-    transform: [{ scaleX: 1.32 }],
+    top: '50%',
+    transform: [{ scaleX: 2.32 }],
     width: '74%',
   },
 
