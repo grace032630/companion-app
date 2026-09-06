@@ -7,9 +7,10 @@ type AnimalCharacterProps = {
   animal: string;
   state: AnimalAnimationState;
   size?: 'small' | 'regular' | 'large';
+  scaleMultiplier?: number;
 };
 
-export function AnimalCharacter({ animal, state, size = 'regular' }: AnimalCharacterProps) {
+export function AnimalCharacter({ animal, state, size = 'regular', scaleMultiplier = 1 }: AnimalCharacterProps) {
   const [translateX] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(0));
   const [scale] = useState(() => new Animated.Value(1));
@@ -62,7 +63,16 @@ export function AnimalCharacter({ animal, state, size = 'regular' }: AnimalChara
   const rotation = rotate.interpolate({ inputRange: [0, 1], outputRange: ['-2deg', '2deg'] });
   return (
     <Animated.View accessibilityLabel={`動物角色，狀態：${state}`} style={{ opacity, transform: [{ translateX }, { translateY }, { rotate: rotation }, { scale }] }}>
-      <Text style={[styles.animal, size === 'small' && styles.smallAnimal, size === 'large' && styles.largeAnimal]}>{animal}</Text>
+      <Text
+        style={[
+          styles.animal,
+          size === 'small' && styles.smallAnimal,
+          size === 'large' && styles.largeAnimal,
+          { transform: [{ scale: scaleMultiplier }] },
+        ]}
+      >
+        {animal}
+      </Text>
     </Animated.View>
   );
 }
