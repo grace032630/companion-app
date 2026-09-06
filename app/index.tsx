@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
@@ -32,9 +32,15 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.topRow}>
+    <ImageBackground
+      source={require('../assets/backgrounds/room-day.png')}
+      resizeMode="cover"
+      style={styles.background}
+    >
+      <View style={styles.backgroundTint} />
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.topRow}>
           <View>
             <Text style={styles.brand}>Companion</Text>
             <Text style={styles.nickname}>嗨 {profile.nickname}</Text>
@@ -70,19 +76,29 @@ export default function HomeScreen() {
           })}
         </View>
 
-        <Pressable
-          disabled={!task}
-          onPress={handleStart}
-          style={({ pressed }) => [styles.startButton, !task && styles.startButtonDisabled, pressed && task && styles.pressed]}>
-          <Text style={[styles.startButtonText, !task && styles.startButtonTextDisabled]}>{task ? '一起開工' : '選一件事'}</Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+          <Pressable
+            disabled={!task}
+            onPress={handleStart}
+            style={({ pressed }) => [styles.startButton, !task && styles.startButtonDisabled, pressed && task && styles.pressed]}>
+            <Text style={[styles.startButtonText, !task && styles.startButtonTextDisabled]}>{task ? '一起開工' : '選一件事'}</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#FFF9F1', flex: 1 },
+  background: { flex: 1 },
+  backgroundTint: {
+    backgroundColor: 'rgba(255,248,239,0.80)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  safeArea: { backgroundColor: 'transparent', flex: 1 },
   loadingWrap: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   scrollContent: { paddingBottom: 32, paddingHorizontal: 24, paddingTop: 20 },
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -90,17 +106,17 @@ const styles = StyleSheet.create({
   nickname: { color: '#8A7A6E', fontSize: 13, marginTop: 4 },
   avatar: { alignItems: 'center', backgroundColor: '#F4E1CF', borderColor: '#E7CEBA', borderRadius: 24, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
   avatarPressed: { opacity: 0.65, transform: [{ scale: 0.96 }] },
-  hero: { backgroundColor: '#FFFFFF', borderColor: '#F0DED0', borderRadius: 28, borderWidth: 1, marginBottom: 28, marginTop: 28, padding: 26, shadowColor: '#795E4B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 18 },
+  hero: { backgroundColor: 'rgba(255,255,255,0.86)', borderColor: 'rgba(240,222,208,0.95)', borderRadius: 28, borderWidth: 1, marginBottom: 28, marginTop: 28, padding: 26, shadowColor: '#795E4B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.10, shadowRadius: 18 },
   prompt: { color: '#493D34', fontSize: 29, fontWeight: '700', lineHeight: 40 },
   companions: { flexDirection: 'row', marginTop: 22 },
   companion: { fontSize: 30, marginRight: 9 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  chip: { backgroundColor: '#FFFFFF', borderColor: '#E7D7C8', borderRadius: 18, borderWidth: 1, paddingHorizontal: 15, paddingVertical: 11 },
+  chip: { backgroundColor: 'rgba(255,249,242,0.90)', borderColor: '#E3CDBB', borderRadius: 18, borderWidth: 1, paddingHorizontal: 15, paddingVertical: 11 },
   chipSelected: { backgroundColor: '#F2D9C4', borderColor: '#C88E69' },
   chipText: { color: '#6F6258', fontSize: 14, fontWeight: '600' },
   chipTextSelected: { color: '#6E432C' },
   startButton: { alignItems: 'center', backgroundColor: '#A86F4D', borderRadius: 18, justifyContent: 'center', marginTop: 28, minHeight: 56 },
-  startButtonDisabled: { backgroundColor: '#E5D8CE' },
+  startButtonDisabled: { backgroundColor: 'rgba(229,216,206,0.92)' },
   startButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   startButtonTextDisabled: { color: '#9D8D82' },
   pressed: { opacity: 0.72 },
