@@ -27,7 +27,7 @@ import {
 import { supabase } from '../lib/supabase';
 import type { AnimalAnimationState, ConstructionActionId, CrewMember } from '../types/crew';
 
-const TASKS = ['打掃房間', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '其他事項'] as const;
+const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '洗澡', '整理帳單', '回覆訊息', '其他事項'] as const;
 const SUPPORT_MESSAGES = ['欸 都進來了 就差真的動手了','手機先放下 去做一下啦','先碰它一下就好 不要想整件事','先做兩分鐘 不爽再回來','起來啦 先把第一個東西拿起來','現在就去 我在這裡等你','不要等有動力 動了再說','做爛也沒差 先做再說'];
 const ROOM_CAPACITY = 6;
 const HEARTBEAT_MS = 20_000;
