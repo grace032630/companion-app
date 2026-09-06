@@ -159,7 +159,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
   return (
     <ImageBackground
       source={require('../assets/backgrounds/room-day.png')}
-      resizeMode="cover"
+      resizeMode="stretch"
       style={[styles.scene, askingHelp && styles.sceneHelp, finished && styles.sceneDone]}
     >
       <View style={styles.sceneShade} />
