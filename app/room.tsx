@@ -32,6 +32,7 @@ const SUPPORT_MESSAGES = ['欸 都進來了 就差真的動手了','手機先放
 const ROOM_CAPACITY = 6;
 const HEARTBEAT_MS = 20_000;
 const COMPLETE_EXIT_MS = 3500;
+const ROOM_MAX_DURATION_MS = 24 * 60 * 60 * 1000;
 
 type Task = (typeof TASKS)[number];
 type BoardItem = { id:string; animal:string; name:string; text:string; kind:RoomStatus; helper:boolean; targetUserId?:string; requestId?:string|null };
@@ -67,6 +68,9 @@ export default function RoomScreen(){
   const [impactState,setImpactState]=useState<'pushed'|'punched'|null>(null);
   const [supportScale]=useState(()=>new Animated.Value(0.92));
   const [bgmEnabled,setBgmEnabled]=useState(true);
+  const [elapsedSeconds,setElapsedSeconds]=useState(0);
+  const roomEnteredAtRef=useRef(Date.now());
+  const autoExitTriggeredRef=useRef(false);
   const bgmPlayer=useAudioPlayer(require('../assets/audio/room-bgm.mp3'));
   const timersRef=useRef<ReturnType<typeof setTimeout>[]>([]);
   const roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);
@@ -94,6 +98,26 @@ export default function RoomScreen(){
   const animateSupport=(kind:SupportKind)=>{supportScale.setValue(0.9);setImpactState(kind==='push'?'pushed':'punched');Vibration.vibrate(kind==='push'?90:[0,70,100,70]);Animated.spring(supportScale,{bounciness:18,speed:23,toValue:1,useNativeDriver:true}).start();timersRef.current.push(setTimeout(()=>setImpactState(null),900));};
   useEffect(()=>()=>clearTimers(),[]);
 
+  useEffect(()=>{
+    const tick=()=>{
+      const elapsedMs=Date.now()-roomEnteredAtRef.current;
+      setElapsedSeconds(Math.floor(elapsedMs/1000));
+    };
+    tick();
+    const timer=setInterval(tick,1000);
+    return()=>clearInterval(timer);
+  },[]);
+
+  useEffect(()=>{
+    if(autoExitTriggeredRef.current)return;
+    if(elapsedSeconds*1000<ROOM_MAX_DURATION_MS)return;
+    const userId=session?.user.id;
+    if(!userId)return;
+    autoExitTriggeredRef.current=true;
+    clearTimers();
+    void leaveRoom(roomSessionIdRef.current,userId).finally(()=>router.replace('/'));
+  },[elapsedSeconds,session?.user.id]);
+
   useEffect(()=>{const userId=session?.user.id;if(!userId||!profile)return;let active=true;void assignRoom(ROOM_CAPACITY).then((id)=>{if(active)setRoomId(id);}).catch((error:unknown)=>{if(active)setRoomError(error instanceof Error?error.message:'加入房間失敗');});return()=>{active=false;};},[profile,session?.user.id]);
 
   useEffect(()=>{const userId=session?.user.id;if(!userId||!profile||!roomId)return;let active=true;let heartbeat:ReturnType<typeof setInterval>|null=null;let roomChannel:ReturnType<typeof subscribeToRoomSessions>|null=null;const roomSessionId=roomSessionIdRef.current;
@@ -117,12 +141,14 @@ export default function RoomScreen(){
   if(!roomId&&!roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><ActivityIndicator color="#A86F4D" size="large"/><Text style={styles.loadingText}>正在幫你找施工房...</Text></View></SafeAreaView>;
   if(roomError)return <SafeAreaView style={styles.safeArea}><View style={styles.loadingWrap}><Text style={styles.errorText}>{roomError}</Text><Pressable onPress={()=>router.replace('/')} style={styles.doneButton}><Text style={styles.doneText}>回首頁</Text></Pressable></View></SafeAreaView>;
   const roomLabel=roomId?`施工房 ${roomId.slice(0,4).toUpperCase()}`:'施工房';
+  const elapsedMinutes=Math.floor(elapsedSeconds/60);
+  const elapsedDisplay=`${String(elapsedMinutes).padStart(2,'0')}:${String(elapsedSeconds%60).padStart(2,'0')}`;
 
   return <SafeAreaView style={styles.safeArea}>
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}><Pressable onPress={()=>setLeaveOpen(true)} style={styles.headerButton}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCenter}><Text style={styles.brand}>Companion</Text><Text style={styles.roomCode}>{roomLabel} · {helpers.length+1}/{ROOM_CAPACITY}</Text></View><View style={styles.headerActions}><Pressable onPress={()=>setBgmEnabled((value)=>!value)} style={styles.headerButton}><Text style={styles.soundIcon}>{bgmEnabled?'🔊':'🔇'}</Text></Pressable><Pressable onPress={()=>setBoardOpen(true)} style={styles.headerButton}><Text style={styles.boardIcon}>📌</Text></Pressable></View></View>
 
-      <RoomScene me={me} helpers={helpers} myState={myAnimationState} task={task} quote={profile?.quote} askingHelp={askingHelp} finished={finished}/>
+      <RoomScene me={me} helpers={helpers} myState={myAnimationState} task={task} quote={profile?.quote} askingHelp={askingHelp} finished={finished} elapsedTime={elapsedDisplay}/>
 
       {helpRequests.map((request)=><View key={request.id} style={styles.helpAlert}><View style={styles.helpAlertCopy}><RoomAnimal animal={request.animal} size={32} state="idle"/><View style={styles.helpAlertTextWrap}><Text style={styles.helpAlertTitle}>{request.name} 卡住了 🥺</Text><Text style={styles.helpAlertText}>正在做「{request.task}」</Text></View></View><View style={styles.helpAlertActions}><Pressable onPress={()=>void supportUser(request,'push')} style={styles.pushButton}><Text style={styles.pushButtonText}>推你一把 👉</Text></Pressable><Pressable onPress={()=>void supportUser(request,'punch')} style={styles.punchButton}><Text style={styles.punchButtonText}>揍一下 👊</Text></Pressable></View></View>)}
 
