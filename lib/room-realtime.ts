@@ -17,6 +17,7 @@ export type RoomSession = {
   action: ConstructionActionId;
   help_request_id: string | null;
   last_seen: string;
+  quote?: string | null;
 };
 
 export type SupportEvent = {
@@ -102,7 +103,24 @@ export async function fetchActiveRoomSessions(userId: string, roomId: string): P
     .limit(5);
 
   if (error) throw error;
-  return (data ?? []) as RoomSession[];
+
+  const sessions = (data ?? []) as RoomSession[];
+  if (sessions.length === 0) return sessions;
+
+  const userIds = sessions.map((session) => session.user_id);
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('user_id,quote')
+    .in('user_id', userIds);
+
+  const quoteByUser = new Map<string, string | null>(
+    (profiles ?? []).map((profile) => [profile.user_id as string, (profile.quote as string | null) ?? null]),
+  );
+
+  return sessions.map((session) => ({
+    ...session,
+    quote: quoteByUser.get(session.user_id) ?? null,
+  }));
 }
 
 export function subscribeToRoomSessions(roomId: string, onChange: () => void): RealtimeChannel {
@@ -171,5 +189,6 @@ export function roomSessionToCrewMember(session: RoomSession): CrewMember {
     isMe: false,
     isNpc: false,
     userId: session.user_id,
+    quote: session.quote ?? null,
   };
 }
