@@ -159,7 +159,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
   return (
     <ImageBackground
       source={require('../assets/backgrounds/room-day.png')}
-      resizeMode="cover"
+      resizeMode="contain"
       style={[styles.scene, askingHelp && styles.sceneHelp, finished && styles.sceneDone]}
     >
       <View style={styles.sceneShade} />
@@ -180,7 +180,14 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
 }
 
 const styles = StyleSheet.create({
-  scene: { borderRadius: 28, height: 610, marginTop: 16, overflow: 'hidden', position: 'relative' },
+  scene: {
+    backgroundColor: '#EEDCCB',
+    borderRadius: 28,
+    height: 610,
+    marginTop: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
   sceneShade: { backgroundColor: 'rgba(53,35,23,0.04)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   sceneHelp: { borderColor: '#E19B78', borderWidth: 2 },
   sceneDone: { borderColor: '#E2C66A', borderWidth: 2 },
