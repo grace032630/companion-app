@@ -16,11 +16,11 @@ type RoomSceneProps = {
 };
 
 const SPOTS = [
-  { left: '5%', top: 188 },
-  { left: '68%', top: 186 },
-  { left: '20%', top: 280 },
-  { left: '58%', top: 282 },
-  { left: '38%', top: 345 },
+  { left: '-2%', top: 215 },
+  { left: '63%', top: 215 },
+  { left: '8%', top: 355 },
+  { left: '57%', top: 355 },
+  { left: '31%', top: 430 },
 ] as const;
 
 function clamp(value: number, min: number, max: number) {
@@ -132,6 +132,7 @@ function Worker({
       <View style={styles.workerBubbleRow}>
         <AnimalCharacter
           animal={member.animal}
+          scaleMultiplier={2}
           size={member.isMe ? 'large' : 'regular'}
           state={forceHelp ? 'idle' : state}
         />
@@ -201,19 +202,25 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         <Animated.View style={[styles.curtainRight, { transform: [{ translateX: Animated.multiply(curtainX, -1) }] }]} />
       </View>
 
-      <View style={styles.wallShelf}><Text style={styles.shelfItems}>📚  🪴</Text></View>
-      <View style={styles.lamp}><Text style={styles.lampText}>💡</Text></View>
+      <View style={styles.wallPanelA} />
+      <View style={styles.wallPanelB} />
+      <View style={styles.wallShelf}><Text style={styles.shelfItems}>📚  🪴  🕯️</Text></View>
+      <View style={styles.sideTable}><View style={styles.tableTop} /><View style={styles.tableLeg} /></View>
+      <View style={styles.floorLamp}><View style={styles.lampShade} /><View style={styles.lampPole} /><View style={styles.lampBase} /></View>
+      <View style={styles.plantPot}><Text style={styles.plantEmoji}>🪴</Text></View>
       <View style={styles.floor} />
+      <View style={styles.floorLineA} />
+      <View style={styles.floorLineB} />
+      <View style={styles.floorLineC} />
       <View style={styles.rug} />
-      <View style={styles.workbench}><Text style={styles.workbenchText}>🧰  🪛  📦</Text></View>
-      <View style={styles.planks}><Text style={styles.plankText}>🪵 🪵</Text></View>
+      <View style={styles.planks}><Text style={styles.plankText}>🪵  🪵</Text></View>
 
       <View style={styles.sceneTitlePill}>
         <Text style={styles.sceneTitle}>{finished ? '施工完成 ✨' : askingHelp ? '先卡一下 會有人來' : '大家正在施工'}</Text>
         <Text style={styles.sceneTask}>{task}</Text>
       </View>
 
-      <Worker member={me} state={myState} spot={{ left: '33%', top: 190 }} delay={120} forceHelp={askingHelp} />
+      <Worker member={me} state={myState} spot={{ left: '30%', top: 275 }} delay={120} forceHelp={askingHelp} />
       {helpers.slice(0, 5).map((member, index) => (
         <Worker key={member.id} member={member} spot={SPOTS[index]} delay={index * 170 + 80} />
       ))}
@@ -225,7 +232,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
 }
 
 const styles = StyleSheet.create({
-  scene: { borderRadius: 28, height: 490, marginTop: 16, overflow: 'hidden', position: 'relative' },
+  scene: { borderRadius: 28, height: 610, marginTop: 16, overflow: 'hidden', position: 'relative' },
   sceneDay: { backgroundColor: '#F7E8D8' },
   sceneNight: { backgroundColor: '#3F4559' },
   sceneHelp: { borderColor: '#E19B78', borderWidth: 2 },
@@ -245,20 +252,30 @@ const styles = StyleSheet.create({
   windowBarH: { backgroundColor: '#A98870', height: 5, left: 0, position: 'absolute', right: 0, top: '53%' },
   curtainLeft: { backgroundColor: '#EAD4C4', borderBottomRightRadius: 22, bottom: 0, left: 0, opacity: 0.9, position: 'absolute', top: 0, width: 28 },
   curtainRight: { backgroundColor: '#EAD4C4', borderBottomLeftRadius: 22, bottom: 0, opacity: 0.9, position: 'absolute', right: 0, top: 0, width: 28 },
-  wallShelf: { backgroundColor: '#B88967', borderRadius: 6, left: 28, paddingHorizontal: 9, paddingVertical: 3, position: 'absolute', top: 183 },
-  shelfItems: { fontSize: 15 },
-  lamp: { position: 'absolute', right: 25, top: 174 },
-  lampText: { fontSize: 24 },
-  floor: { backgroundColor: '#B78766', bottom: 0, height: 158, left: 0, opacity: 0.9, position: 'absolute', right: 0 },
-  rug: { backgroundColor: '#D8B99F', borderRadius: 100, bottom: 24, height: 98, left: '15%', opacity: 0.8, position: 'absolute', width: '70%' },
-  workbench: { backgroundColor: '#9F7153', borderRadius: 9, bottom: 111, left: 18, paddingHorizontal: 8, paddingVertical: 5, position: 'absolute' },
-  workbenchText: { fontSize: 15 },
-  planks: { bottom: 16, position: 'absolute', right: 15 },
-  plankText: { fontSize: 22 },
+  wallPanelA: { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 40, height: 120, left: -30, position: 'absolute', top: 165, width: 150 },
+  wallPanelB: { backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 55, height: 150, position: 'absolute', right: -35, top: 150, width: 180 },
+  wallShelf: { backgroundColor: '#A97655', borderRadius: 8, left: 30, paddingHorizontal: 11, paddingVertical: 5, position: 'absolute', top: 187 },
+  shelfItems: { fontSize: 17 },
+  sideTable: { height: 62, position: 'absolute', right: 28, top: 200, width: 64 },
+  tableTop: { backgroundColor: '#9E6E4F', borderRadius: 8, height: 12, left: 0, position: 'absolute', right: 0, top: 0 },
+  tableLeg: { backgroundColor: '#855B43', borderRadius: 4, height: 52, left: 28, position: 'absolute', top: 9, width: 8 },
+  floorLamp: { height: 118, position: 'absolute', right: 26, top: 104, width: 62 },
+  lampShade: { backgroundColor: '#F4C98B', borderRadius: 18, height: 34, left: 7, position: 'absolute', top: 0, width: 48 },
+  lampPole: { backgroundColor: '#8A6652', height: 72, left: 29, position: 'absolute', top: 31, width: 5 },
+  lampBase: { backgroundColor: '#8A6652', borderRadius: 10, bottom: 0, height: 9, left: 17, position: 'absolute', width: 30 },
+  plantPot: { left: 18, position: 'absolute', top: 246 },
+  plantEmoji: { fontSize: 34 },
+  floor: { backgroundColor: '#B27F5F', bottom: 0, height: 250, left: 0, opacity: 0.95, position: 'absolute', right: 0 },
+  floorLineA: { backgroundColor: 'rgba(104,69,48,0.17)', bottom: 62, height: 2, left: 0, position: 'absolute', right: 0, transform: [{ rotate: '-5deg' }] },
+  floorLineB: { backgroundColor: 'rgba(104,69,48,0.14)', bottom: 132, height: 2, left: 0, position: 'absolute', right: 0, transform: [{ rotate: '4deg' }] },
+  floorLineC: { backgroundColor: 'rgba(104,69,48,0.12)', bottom: 202, height: 2, left: 0, position: 'absolute', right: 0 },
+  rug: { backgroundColor: '#E1C6AE', borderRadius: 120, bottom: 30, height: 150, left: '10%', opacity: 0.9, position: 'absolute', width: '80%' },
+  planks: { bottom: 20, position: 'absolute', right: 18 },
+  plankText: { fontSize: 23 },
   sceneTitlePill: { alignItems: 'center', backgroundColor: 'rgba(255,249,243,0.91)', borderRadius: 16, left: '27%', paddingHorizontal: 13, paddingVertical: 7, position: 'absolute', top: 177, width: '46%' },
   sceneTitle: { color: '#6B5142', fontSize: 11, fontWeight: '900' },
   sceneTask: { color: '#917465', fontSize: 9, marginTop: 2 },
-  worker: { alignItems: 'center', position: 'absolute', width: 126 },
+  worker: { alignItems: 'center', position: 'absolute', width: 150 },
   draggableWorker: { zIndex: 20 },
   workerBubbleRow: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'center' },
   namePill: { alignItems: 'center', backgroundColor: 'rgba(255,250,246,0.92)', borderRadius: 10, marginTop: 1, maxWidth: 84, paddingHorizontal: 6, paddingVertical: 3 },
