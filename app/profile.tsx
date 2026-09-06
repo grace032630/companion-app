@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ImageBackground,
@@ -20,6 +20,11 @@ import { ANIMAL_OPTIONS } from '../constants/crew';
 import { checkInToday, fetchActivitySummary, type ActivitySummary } from '../lib/activity';
 import { useAuth } from '../lib/auth';
 import { MAX_QUOTE_LENGTH, validatePublicQuote } from '../lib/content-filter';
+import {
+  fetchFriends,
+  fetchPendingFriendRequests,
+  type Friend,
+} from '../lib/friends';
 import { LANGUAGE_OPTIONS } from '../lib/i18n';
 import { useProfile, type AppLanguage } from '../lib/profile';
 import { claimDailyStrawberry, fetchStrawberryTotal } from '../lib/strawberries';
@@ -49,6 +54,9 @@ export default function ProfileScreen() {
   const [checkingIn, setCheckingIn] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [pendingFriendCount, setPendingFriendCount] = useState(0);
+  const [loadingFriends, setLoadingFriends] = useState(true);
 
   useEffect(() => {
     setNickname(profile?.nickname ?? '');
@@ -83,6 +91,37 @@ export default function ProfileScreen() {
   useEffect(() => {
     void loadSummary();
   }, [session?.user.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!session?.user.id) return;
+      let active = true;
+
+      const loadFriendPreview = async () => {
+        setLoadingFriends(true);
+        try {
+          const [nextRequests, nextFriends] = await Promise.all([
+            fetchPendingFriendRequests(),
+            fetchFriends(),
+          ]);
+          if (!active) return;
+          setPendingFriendCount(nextRequests.length);
+          setFriends(nextFriends);
+        } catch {
+          if (!active) return;
+          setPendingFriendCount(0);
+          setFriends([]);
+        } finally {
+          if (active) setLoadingFriends(false);
+        }
+      };
+
+      void loadFriendPreview();
+      return () => {
+        active = false;
+      };
+    }, [session?.user.id]),
+  );
 
   const handleCheckIn = async () => {
     const userId = session?.user.id;
@@ -277,6 +316,33 @@ export default function ProfileScreen() {
               <View style={styles.badgeCard}><Text style={styles.badgeIcon}>🔥</Text><Text style={styles.statValue}>{summary.streak}</Text><Text style={styles.statLabel}>連續天數</Text></View>
             </View>
 
+            <Text style={styles.sectionHeading}>好友</Text>
+            <Pressable onPress={() => router.push('/friends')} style={styles.friendPreviewCard}>
+              <View style={styles.friendPreviewHeader}>
+                <Text style={styles.friendPreviewCount}>{loadingFriends ? '好友讀取中…' : '好友小屋'}</Text>
+                <Text style={styles.friendPreviewLink}>查看全部 ›</Text>
+              </View>
+              {pendingFriendCount > 0 ? (
+                <View style={styles.pendingHint}>
+                  <Text style={styles.pendingHintText}>💌 有 {pendingFriendCount} 個好友邀請</Text>
+                </View>
+              ) : null}
+              {!loadingFriends && friends.length === 0 ? (
+                <Text style={styles.friendPreviewEmpty}>還沒有好友，去邀請施工夥伴吧～</Text>
+              ) : (
+                <View style={styles.friendPreviewList}>
+                  {friends.slice(0, 3).map((friend) => (
+                    <View key={friend.userId} style={styles.friendPreviewPerson}>
+                      <View style={styles.friendPreviewCharacter}>
+                        <AnimalCharacter animal={friend.animal} size="small" state="idle" />
+                      </View>
+                      <Text numberOfLines={1} style={styles.friendPreviewName}>{friend.nickname}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Pressable>
+
             <Text style={styles.sectionHeading}>施工日誌</Text>
             <View style={styles.logCard}>
               {loadingSummary ? (
@@ -337,6 +403,7 @@ export default function ProfileScreen() {
               </View>
             </View>
           </Modal>
+
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -407,6 +474,17 @@ const styles = StyleSheet.create({
   badgeIcon: { fontSize: 18, marginBottom: 2 },
   statValue: { color: '#4D3F36', fontSize: 22, fontWeight: '900' },
   statLabel: { color: '#937B6C', fontSize: 11, marginTop: 4 },
+  friendPreviewCard: { backgroundColor: '#FFFFFF', borderColor: '#E9D9CD', borderRadius: 22, borderWidth: 1, padding: 16 },
+  friendPreviewHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  friendPreviewCount: { color: '#5A483C', fontSize: 14, fontWeight: '900' },
+  friendPreviewLink: { color: '#8A6450', fontSize: 12, fontWeight: '900' },
+  pendingHint: { alignSelf: 'flex-start', backgroundColor: '#FFF0E2', borderRadius: 11, marginTop: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  pendingHintText: { color: '#9A664A', fontSize: 11, fontWeight: '800' },
+  friendPreviewList: { flexDirection: 'row', gap: 12, marginTop: 13 },
+  friendPreviewPerson: { alignItems: 'center', flex: 1, minWidth: 0 },
+  friendPreviewCharacter: { alignItems: 'center', backgroundColor: '#FFF7EF', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  friendPreviewName: { color: '#674F41', fontSize: 11, fontWeight: '800', marginTop: 5, maxWidth: '100%' },
+  friendPreviewEmpty: { color: '#9C897B', fontSize: 12, marginTop: 13, textAlign: 'center' },
   logCard: { backgroundColor: '#FFFFFF', borderColor: '#E9D9CD', borderRadius: 22, borderWidth: 1, padding: 18 },
   emptyText: { color: '#9C897B', fontSize: 13, lineHeight: 20, textAlign: 'center' },
   logRow: { alignItems: 'center', flexDirection: 'row', paddingVertical: 9 },
