@@ -6,7 +6,6 @@ import { AnimalCharacter } from './AnimalCharacter';
 import { ConstructionAction } from './ConstructionAction';
 
 const ROOM_DAY_BACKGROUND = require('../assets/backgrounds/room-day.png');
-const ROOM_DAY_ASPECT_RATIO = 941 / 1323;
 
 type RoomSceneProps = {
   me: CrewMember;
@@ -165,7 +164,6 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
       resizeMode="cover"
       style={[
         styles.scene,
-        { aspectRatio: ROOM_DAY_ASPECT_RATIO },
         askingHelp && styles.sceneHelp,
         finished && styles.sceneDone,
       ]}
@@ -191,6 +189,7 @@ const styles = StyleSheet.create({
   scene: {
     backgroundColor: '#EEDCCB',
     borderRadius: 28,
+    height: 610,
     marginTop: 16,
     overflow: 'hidden',
     position: 'relative',
