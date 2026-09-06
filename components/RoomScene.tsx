@@ -353,7 +353,12 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
           delay={index * 170 + 80}
           quote={member.isNpc ? null : member.quote}
           controlsLocked={Boolean(collision) || finished}
-          hidden={Boolean(collision && (collision.actor.memberId === member.id || collision.target.memberId === member.id || collision.actor.userId === member.userId || collision.target.userId === member.userId))}
+          hidden={Boolean(collision && (
+            collision.actor.memberId === member.id
+            || collision.target.memberId === member.id
+            || Boolean(collision.actor.userId && collision.actor.userId === member.userId)
+            || Boolean(collision.target.userId && collision.target.userId === member.userId)
+          ))}
           celebrationText={finished ? CELEBRATION_MESSAGES[index % CELEBRATION_MESSAGES.length] : undefined}
         />
       ))}
