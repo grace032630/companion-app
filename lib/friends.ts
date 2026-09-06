@@ -39,13 +39,6 @@ type FriendRow = {
   checked_in_today: boolean;
 };
 
-function localDateKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function throwIfError(error: { message: string } | null) {
   if (error) throw error;
 }
@@ -95,9 +88,7 @@ export async function rejectFriendRequest(requestId: string) {
 }
 
 export async function fetchFriends(): Promise<Friend[]> {
-  const { data, error } = await supabase.rpc('fetch_friends', {
-    p_local_date: localDateKey(),
-  });
+  const { data, error } = await supabase.rpc('fetch_friends');
   throwIfError(error);
 
   return ((data ?? []) as FriendRow[]).map((row) => ({
@@ -113,7 +104,6 @@ export async function fetchFriends(): Promise<Friend[]> {
 export async function remindFriend(friendUserId: string): Promise<FriendReminderResult> {
   const { data, error } = await supabase.rpc('remind_friend', {
     p_friend_user_id: friendUserId,
-    p_reminder_date: localDateKey(),
   });
   throwIfError(error);
   return data as FriendReminderResult;
@@ -122,7 +112,6 @@ export async function remindFriend(friendUserId: string): Promise<FriendReminder
 export async function giftFriendStrawberry(friendUserId: string): Promise<FriendStrawberryGiftResult> {
   const { data, error } = await supabase.rpc('gift_friend_strawberry', {
     p_friend_user_id: friendUserId,
-    p_gift_date: localDateKey(),
   });
   throwIfError(error);
   return data as FriendStrawberryGiftResult;
@@ -138,6 +127,7 @@ export function friendErrorMessage(error: unknown) {
   if (message.includes('FRIEND_ID_NOT_FOUND')) return '找不到這個好友 ID，再確認一下～';
   if (message.includes('CANNOT_ADD_SELF')) return '這是你自己的好友 ID 唷～';
   if (message.includes('FRIENDSHIP_ALREADY_EXISTS')) return '你們已經有邀請或是好友啦！';
+  if (message.includes('FRIEND_REQUEST_RATE_LIMIT')) return '今天送太多好友邀請啦～明天再試試看';
   if (message.includes('NOT_FRIENDS')) return '要先成為好友才能這麼做唷～';
   if (message.includes('FRIEND_REQUEST_NOT_PENDING')) return '這個邀請已經處理過了～';
   if (message.includes('NOT_AUTHENTICATED')) return '登入狀態過期了，請重新登入。';

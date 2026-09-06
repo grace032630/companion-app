@@ -128,7 +128,7 @@ export default function ProfileScreen() {
     if (!userId || summary.checkedInToday) return;
     setCheckingIn(true);
     setMessage(null);
-    const { error } = await checkInToday(userId);
+    const { error } = await checkInToday();
     if (error) setMessage(error.message);
     else {
       await loadSummary();

@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+const APP_TIME_ZONE = 'Asia/Taipei';
+const APP_UTC_OFFSET = '+08:00';
+
 export type TaskCompletion = { id: number; task: string; completed_at: string };
 
 export type ActivitySummary = {
@@ -11,30 +14,45 @@ export type ActivitySummary = {
 };
 
 function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
   return `${year}-${month}-${day}`;
 }
 
-export async function checkInToday(userId: string) {
-  return supabase.from('daily_checkins').upsert(
-    { user_id: userId, checkin_date: toDateKey(new Date()) },
-    { onConflict: 'user_id,checkin_date' },
-  );
+function addDays(dateKey: string, amount: number) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
 }
 
-export async function recordTaskCompletion(userId: string, task: string) {
-  return supabase.from('task_completions').insert({ user_id: userId, task });
+function appDayStart(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00${APP_UTC_OFFSET}`);
+}
+
+export async function checkInToday() {
+  return supabase.rpc('check_in_today');
+}
+
+export async function recordTaskCompletion(roomSessionId: string) {
+  return supabase.rpc('record_room_task_completion', {
+    p_room_session_id: roomSessionId,
+  });
 }
 
 export async function fetchActivitySummary(userId: string): Promise<ActivitySummary> {
   const now = new Date();
   const todayKey = toDateKey(now);
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfWeek = new Date(startOfToday);
-  const weekday = (startOfWeek.getDay() + 6) % 7;
-  startOfWeek.setDate(startOfWeek.getDate() - weekday);
+  const startOfToday = appDayStart(todayKey);
+  const startOfTomorrow = appDayStart(addDays(todayKey, 1));
+  const weekday = (new Date(`${todayKey}T12:00:00Z`).getUTCDay() + 6) % 7;
+  const startOfWeek = appDayStart(addDays(todayKey, -weekday));
 
   const [checkinsResult, completionsResult] = await Promise.all([
     supabase
@@ -57,13 +75,16 @@ export async function fetchActivitySummary(userId: string): Promise<ActivitySumm
   const checkinSet = new Set(checkins.map((item) => item.checkin_date));
 
   let streak = 0;
-  const cursor = new Date(startOfToday);
-  while (checkinSet.has(toDateKey(cursor))) {
+  let cursorKey = todayKey;
+  while (checkinSet.has(cursorKey)) {
     streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
+    cursorKey = addDays(cursorKey, -1);
   }
 
-  const todayCompleted = completions.filter((item) => new Date(item.completed_at) >= startOfToday).length;
+  const todayCompleted = completions.filter((item) => {
+    const completedAt = new Date(item.completed_at);
+    return completedAt >= startOfToday && completedAt < startOfTomorrow;
+  }).length;
 
   return {
     checkedInToday: checkinSet.has(todayKey),
