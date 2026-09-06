@@ -6,7 +6,7 @@ import { AnimalCharacter } from './AnimalCharacter';
 import { ConstructionAction } from './ConstructionAction';
 
 const ROOM_DAY_BACKGROUND = require('../assets/backgrounds/room-day.png');
-const ROOM_DAY_ASPECT_RATIO = 9 / 16;
+const ROOM_DAY_ASPECT_RATIO = 941 / 1323;
 
 type RoomSceneProps = {
   me: CrewMember;
