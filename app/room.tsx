@@ -31,7 +31,7 @@ const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事',
 const SUPPORT_MESSAGES = ['欸 都進來了 就差真的動手了','手機先放下 去做一下啦','先碰它一下就好 不要想整件事','先做兩分鐘 不爽再回來','起來啦 先把第一個東西拿起來','現在就去 我在這裡等你','不要等有動力 動了再說','做爛也沒差 先做再說'];
 const ROOM_CAPACITY = 6;
 const HEARTBEAT_MS = 20_000;
-const COMPLETE_EXIT_MS = 3500;
+const COMPLETE_EXIT_MS = 7000;
 const ROOM_MAX_DURATION_MS = 24 * 60 * 60 * 1000;
 
 type Task = (typeof TASKS)[number];
