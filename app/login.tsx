@@ -143,7 +143,7 @@ export default function LoginScreen() {
   return (
     <ImageBackground
       source={require('../assets/backgrounds/login-bg.png')}
-      resizeMode="cover"
+      resizeMode="contain"
       style={styles.background}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
@@ -250,7 +250,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1, width: '100%' },
+  background: { backgroundColor: '#F7E6D2', flex: 1, width: '100%' },
   safeArea: { backgroundColor: 'transparent', flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 20 },
   content: { alignSelf: 'center', flex: 1, justifyContent: 'flex-end', maxWidth: 430, minHeight: 760, paddingBottom: 18, paddingTop: 390, width: '100%' },
