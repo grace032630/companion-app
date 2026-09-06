@@ -22,7 +22,8 @@ if (Platform.OS === 'web' && typeof window !== 'undefined') {
   WebBrowser.maybeCompleteAuthSession();
 }
 
-type AuthMethod = 'google' | 'apple' | null;
+type AuthMethod = 'google' | 'apple' | 'line' | null;
+type OAuthProvider = Parameters<typeof supabase.auth.signInWithOAuth>[0]['provider'];
 
 async function createSessionFromUrl(url: string) {
   const { params, errorCode } = QueryParams.getQueryParams(url);
@@ -57,14 +58,17 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isLoading = activeMethod !== null;
 
-  const handleGoogleSignIn = async () => {
-    setActiveMethod('google');
+  const handleOAuthSignIn = async (
+    method: Exclude<AuthMethod, 'apple' | null>,
+    provider: OAuthProvider,
+  ) => {
+    setActiveMethod(method);
     setErrorMessage(null);
 
     try {
       const redirectTo = makeRedirectUri({ scheme: 'companionapp' });
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider,
         options: {
           redirectTo,
           skipBrowserRedirect: true,
@@ -76,7 +80,7 @@ export default function LoginScreen() {
       }
 
       if (!data.url) {
-        throw new Error('Unable to open Google sign-in. Please try again.');
+        throw new Error(`Unable to open ${method === 'line' ? 'LINE' : 'Google'} sign-in. Please try again.`);
       }
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
@@ -90,6 +94,9 @@ export default function LoginScreen() {
       setActiveMethod(null);
     }
   };
+
+  const handleGoogleSignIn = () => handleOAuthSignIn('google', 'google');
+  const handleLineSignIn = () => handleOAuthSignIn('line', 'custom:line');
 
   const handleAppleSignIn = async () => {
     setActiveMethod('apple');
@@ -190,6 +197,28 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
+            <Pressable
+              accessibilityRole="button"
+              disabled={isLoading}
+              onPress={handleLineSignIn}
+              style={({ pressed }) => [
+                styles.authButton,
+                styles.lineButton,
+                pressed && styles.buttonPressed,
+                isLoading && styles.buttonDisabled,
+              ]}>
+              {activeMethod === 'line' ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <View style={styles.lineIcon}>
+                    <Text style={styles.lineIconText}>LINE</Text>
+                  </View>
+                  <Text style={styles.lineButtonText}>Continue with LINE</Text>
+                </>
+              )}
+            </Pressable>
+
             {Platform.OS === 'ios' ? (
               <View
                 pointerEvents={isLoading ? 'none' : 'auto'}
@@ -266,6 +295,10 @@ const styles = StyleSheet.create({
   googleIcon: { alignItems: 'center', borderColor: '#E5DED8', borderRadius: 10, borderWidth: 1, height: 28, justifyContent: 'center', left: 18, position: 'absolute', width: 28 },
   googleIconText: { color: '#4285F4', fontSize: 17, fontWeight: '800' },
   googleButtonText: { color: '#493D34', fontSize: 16, fontWeight: '600' },
+  lineButton: { backgroundColor: '#06C755' },
+  lineIcon: { alignItems: 'center', height: 28, justifyContent: 'center', left: 18, position: 'absolute', width: 36 },
+  lineIconText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  lineButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   appleButtonWrap: { height: 56, position: 'relative' },
   appleNativeButton: { height: 56, width: '100%' },
   appleLoading: { alignItems: 'center', backgroundColor: '#171513', borderRadius: 16, height: 56, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },

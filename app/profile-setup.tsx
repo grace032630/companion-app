@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,10 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { ANIMAL_OPTIONS } from '../constants/crew';
+import { parseRoomReturnTo } from '../lib/deep-link';
 import { useProfile } from '../lib/profile';
 
 export default function ProfileSetupScreen() {
   const { profile, saveProfile } = useProfile();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [nickname, setNickname] = useState(profile?.nickname ?? '');
   const [animal, setAnimal] = useState<string>(profile?.animal ?? ANIMAL_OPTIONS[0]);
   const [saving, setSaving] = useState(false);
@@ -45,7 +47,7 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    router.replace('/');
+    router.replace(parseRoomReturnTo(params.returnTo) ?? '/');
   };
 
   return (

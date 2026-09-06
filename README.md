@@ -39,3 +39,14 @@ npm run typecheck
 ```
 
 Google authentication uses Supabase OAuth. Apple authentication uses the native iOS identity token when it is available; non-iOS platforms remain safe and show a platform notice.
+
+## LINE and deep links
+
+The native scheme remains `companionapp`. Room links support
+`companionapp://room` and `companionapp://room?roomId=...`, including returning
+to the room after authentication and profile setup.
+
+`companion.example.com` in `app.json` is a placeholder for the future Universal
+Link / Android App Link domain. Replace it before release and host the required
+association files. See [docs/line-integration.md](docs/line-integration.md) for
+the LINE Developers, Supabase provider, domain, and notification setup checklist.

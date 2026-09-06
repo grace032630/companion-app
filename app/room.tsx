@@ -45,11 +45,11 @@ const SUPPORT_MESSAGES=[
 ];
 const ROOM_CAPACITY=6, HEARTBEAT_MS=20_000, COMPLETE_EXIT_MS=3500, ROOM_MAX_DURATION_MS=24*60*60*1000, COMPLETION_NOTICE_MS=3000, COLLISION_MS=2200;
 const ROOM_BGM_TRACKS = [
- require('../assets/audio/room-bgm.mp3'),
- require('../assets/audio/room-bgm-2.mp3'),
- require('../assets/audio/room-bgm-3.mp3'),
- require('../assets/audio/room-bgm-4.mp3'),
- require('../assets/audio/room-bgm-5.mp3'),
+ {source:require('../assets/audio/room-bgm.mp3'),volume:.45},
+ {source:require('../assets/audio/room-bgm-2.mp3'),volume:.181},
+ {source:require('../assets/audio/room-bgm-3.mp3'),volume:.239},
+ {source:require('../assets/audio/room-bgm-4.mp3'),volume:.22},
+ {source:require('../assets/audio/room-bgm-5.mp3'),volume:.25},
 ] as const;
 type Task=(typeof TASKS)[number];
 type BoardItem={id:string;animal:string;name:string;text:string;kind:RoomStatus;helper:boolean;targetUserId?:string;requestId?:string|null};
@@ -66,11 +66,11 @@ export default function RoomScreen(){
  const {session}=useAuth();const {profile}=useProfile();const params=useLocalSearchParams<{task?:string}>();const initialTask:Task=isTask(params.task)?params.task:'其他事項';
  const [task,setTask]=useState<Task>(initialTask),[myAction,setMyAction]=useState<ConstructionActionId>(()=>pick(CONSTRUCTION_ACTION_IDS));const [npcPool]=useState(makeNpcPool);const [npcTasks]=useState<Task[]>(()=>shuffle(TASKS).slice(0,ROOM_CAPACITY-1));
  const [roomId,setRoomId]=useState<string|null>(null),[roomError,setRoomError]=useState<string|null>(null),[liveSessions,setLiveSessions]=useState<RoomSession[]>([]),[status,setStatus]=useState<RoomStatus>('working'),[helpRequestId,setHelpRequestId]=useState<string|null>(null),[boardOpen,setBoardOpen]=useState(false),[leaveOpen,setLeaveOpen]=useState(false),[strawberryOpen,setStrawberryOpen]=useState(false),[supportIndex,setSupportIndex]=useState(()=>Math.floor(Math.random()*SUPPORT_MESSAGES.length)),[notice,setNotice]=useState<string|null>(null),[completionNotice,setCompletionNotice]=useState<string|null>(null),[completionQueue,setCompletionQueue]=useState<string[]>([]),[supportText,setSupportText]=useState<string|null>(null),[supportKind,setSupportKind]=useState<SupportKind|null>(null),[impactState,setImpactState]=useState<'pushed'|'punched'|null>(null),[collision,setCollision]=useState<RoomCollision|null>(null),[collisionQueue,setCollisionQueue]=useState<RoomCollision[]>([]),[supportScale]=useState(()=>new Animated.Value(0.92)),[bgmEnabled,setBgmEnabled]=useState(true),[elapsedSeconds,setElapsedSeconds]=useState(0);
- const roomEnteredAtRef=useRef(Date.now()),autoExitTriggeredRef=useRef(false),completionLoggedRef=useRef(false),isResumingRef=useRef(false),timersRef=useRef<ReturnType<typeof setTimeout>[]>([]),roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);const [roomBgmSource]=useState(()=>pick(ROOM_BGM_TRACKS));const bgmPlayer=useAudioPlayer(roomBgmSource);
+ const roomEnteredAtRef=useRef(Date.now()),autoExitTriggeredRef=useRef(false),completionLoggedRef=useRef(false),isResumingRef=useRef(false),timersRef=useRef<ReturnType<typeof setTimeout>[]>([]),roomSessionIdRef=useRef(`room-session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`);const [roomBgm]=useState(()=>pick(ROOM_BGM_TRACKS));const bgmPlayer=useAudioPlayer(roomBgm.source);
  const me=useMemo<CrewMember>(()=>({id:'me',action:myAction,animal:profile?.animal??'🐱',isMe:true,name:profile?.nickname??'你',userId:session?.user.id}),[myAction,profile?.animal,profile?.nickname,session?.user.id]);
  const realHelpers=liveSessions.slice(0,5).map(roomSessionToCrewMember),npcHelpers=npcPool.slice(0,Math.max(0,5-realHelpers.length)),helpers=[...realHelpers,...npcHelpers],askingHelp=status==='help',finished=status==='done',myAnimationState:AnimalAnimationState=finished?'done':impactState??(askingHelp?'idle':'working'),helpRequests=liveSessions.filter((item)=>item.status==='help'&&item.help_request_id),board=[makeBoardItem(me,task,status),...liveSessions.slice(0,5).map(makeSessionBoardItem),...npcHelpers.map((member,index)=>makeBoardItem(member,npcTasks[index]??'其他事項'))].slice(0,6);
  const clearTimers=()=>{timersRef.current.forEach(clearTimeout);timersRef.current=[];};
- useEffect(()=>{bgmPlayer.loop=true;bgmPlayer.volume=.45;bgmEnabled?bgmPlayer.play():bgmPlayer.pause();return()=>bgmPlayer.pause();},[bgmEnabled,bgmPlayer]);
+ useEffect(()=>{bgmPlayer.loop=true;bgmPlayer.volume=roomBgm.volume;bgmEnabled?bgmPlayer.play():bgmPlayer.pause();return()=>bgmPlayer.pause();},[bgmEnabled,bgmPlayer,roomBgm.volume]);
  const animateSupport=(kind:SupportKind)=>{supportScale.setValue(.9);setImpactState(kind==='push'?'pushed':'punched');Vibration.vibrate(kind==='push'?120:[0,90,100,120]);Animated.spring(supportScale,{bounciness:18,speed:23,toValue:1,useNativeDriver:true}).start();timersRef.current.push(setTimeout(()=>setImpactState(null),1800));};
  const playCollision=(next:RoomCollision)=>setCollisionQueue((current)=>[...current,next]);
  useEffect(()=>{if(collision||collisionQueue.length===0)return;setCollision(collisionQueue[0]);setCollisionQueue((current)=>current.slice(1));},[collision,collisionQueue]);

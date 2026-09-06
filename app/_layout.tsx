@@ -1,12 +1,14 @@
-import { Redirect, Stack, usePathname } from 'expo-router';
+import { Redirect, Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '../lib/auth';
+import { createRoomReturnTo, parseRoomReturnTo, serializeRoomTarget } from '../lib/deep-link';
 import { ProfileProvider } from '../lib/profile';
 
 function RootNavigator() {
   const { session, loading } = useAuth();
   const pathname = usePathname();
+  const params = useGlobalSearchParams<{ returnTo?: string | string[]; roomId?: string | string[] }>();
 
   if (loading) {
     return (
@@ -17,13 +19,19 @@ function RootNavigator() {
   }
 
   const isLoginRoute = pathname === '/login';
+  const incomingRoomReturnTo = pathname === '/room' ? createRoomReturnTo(params.roomId) : null;
+  const postLoginTarget = parseRoomReturnTo(params.returnTo);
 
   if (!session && !isLoginRoute) {
-    return <Redirect href="/login" />;
+    return incomingRoomReturnTo
+      ? <Redirect href={{ pathname: '/login', params: { returnTo: incomingRoomReturnTo } }} />
+      : <Redirect href="/login" />;
   }
 
   if (session && isLoginRoute) {
-    return <Redirect href="/" />;
+    return postLoginTarget
+      ? <Redirect href={{ pathname: '/', params: { returnTo: serializeRoomTarget(postLoginTarget) } }} />
+      : <Redirect href="/" />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;

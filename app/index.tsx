@@ -1,10 +1,11 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { useAuth } from '../lib/auth';
+import { parseRoomReturnTo, serializeRoomTarget } from '../lib/deep-link';
 import { useProfile } from '../lib/profile';
 import { fetchOwnActiveRoomSession } from '../lib/room-realtime';
 
@@ -13,6 +14,8 @@ const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事',
 export default function HomeScreen() {
   const { session } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const postLoginTarget = parseRoomReturnTo(params.returnTo);
   const [task, setTask] = useState<string | null>(null);
   const [checkingRoom, setCheckingRoom] = useState(true);
 
@@ -55,8 +58,12 @@ export default function HomeScreen() {
   }
 
   if (!profile) {
-    return <Redirect href="/profile-setup" />;
+    return postLoginTarget
+      ? <Redirect href={{ pathname: '/profile-setup', params: { returnTo: serializeRoomTarget(postLoginTarget) } }} />
+      : <Redirect href="/profile-setup" />;
   }
+
+  if (postLoginTarget) return <Redirect href={postLoginTarget} />;
 
   const handleStart = () => {
     if (!task) return;
