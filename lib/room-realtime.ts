@@ -20,6 +20,16 @@ export type RoomSession = {
   quote?: string | null;
 };
 
+export type RoomCompletionEvent = {
+  id: string;
+  room_id: string;
+  user_id: string;
+  name: string;
+  animal: string;
+  task: string;
+  created_at: string;
+};
+
 export type SupportEvent = {
   id: string;
   room_id: string;
@@ -108,68 +118,49 @@ export async function fetchActiveRoomSessions(userId: string, roomId: string): P
   if (sessions.length === 0) return sessions;
 
   const userIds = sessions.map((session) => session.user_id);
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('user_id,quote')
-    .in('user_id', userIds);
-
+  const { data: profiles } = await supabase.from('profiles').select('user_id,quote').in('user_id', userIds);
   const quoteByUser = new Map<string, string | null>(
     (profiles ?? []).map((profile) => [profile.user_id as string, (profile.quote as string | null) ?? null]),
   );
 
-  return sessions.map((session) => ({
-    ...session,
-    quote: quoteByUser.get(session.user_id) ?? null,
-  }));
+  return sessions.map((session) => ({ ...session, quote: quoteByUser.get(session.user_id) ?? null }));
 }
 
 export function subscribeToRoomSessions(roomId: string, onChange: () => void): RealtimeChannel {
   return supabase
     .channel(`room-${roomId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'room_sessions',
-        filter: `room_id=eq.${roomId}`,
-      },
-      onChange,
-    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'room_sessions', filter: `room_id=eq.${roomId}` }, onChange)
     .subscribe();
 }
 
-export function subscribeToSupportEvents(
-  roomId: string,
-  userId: string,
-  onEvent: (event: SupportEvent) => void,
-): RealtimeChannel {
+export function subscribeToRoomCompletions(roomId: string, onEvent: (event: RoomCompletionEvent) => void): RealtimeChannel {
+  return supabase
+    .channel(`room-completions-${roomId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'room_completion_events', filter: `room_id=eq.${roomId}` }, (payload) => onEvent(payload.new as RoomCompletionEvent))
+    .subscribe();
+}
+
+export async function broadcastRoomCompletion(input: { roomId: string; userId: string; name: string; animal: string; task: string }) {
+  return supabase.from('room_completion_events').insert({
+    room_id: input.roomId,
+    user_id: input.userId,
+    name: input.name,
+    animal: input.animal,
+    task: input.task,
+  });
+}
+
+export function subscribeToSupportEvents(roomId: string, userId: string, onEvent: (event: SupportEvent) => void): RealtimeChannel {
   return supabase
     .channel(`support-${roomId}-${userId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'support_events',
-        filter: `target_user_id=eq.${userId}`,
-      },
-      (payload) => {
-        const event = payload.new as SupportEvent;
-        if (event.room_id === roomId) onEvent(event);
-      },
-    )
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_events', filter: `target_user_id=eq.${userId}` }, (payload) => {
+      const event = payload.new as SupportEvent;
+      if (event.room_id === roomId) onEvent(event);
+    })
     .subscribe();
 }
 
-export async function sendSupportEvent(input: {
-  roomId: string;
-  requestId: string;
-  targetUserId: string;
-  kind: SupportKind;
-  actorName: string;
-  actorAnimal: string;
-}) {
+export async function sendSupportEvent(input: { roomId: string; requestId: string; targetUserId: string; kind: SupportKind; actorName: string; actorAnimal: string }) {
   return supabase.rpc('send_support_event', {
     p_room_id: input.roomId,
     p_request_id: input.requestId,
@@ -181,14 +172,5 @@ export async function sendSupportEvent(input: {
 }
 
 export function roomSessionToCrewMember(session: RoomSession): CrewMember {
-  return {
-    id: session.id,
-    animal: session.animal,
-    name: session.name,
-    action: session.action,
-    isMe: false,
-    isNpc: false,
-    userId: session.user_id,
-    quote: session.quote ?? null,
-  };
+  return { id: session.id, animal: session.animal, name: session.name, action: session.action, isMe: false, isNpc: false, userId: session.user_id, quote: session.quote ?? null };
 }
