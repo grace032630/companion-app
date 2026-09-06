@@ -15,7 +15,6 @@ export function AnimalCharacter({ animal, state, size = 'regular', scaleMultipli
   const [translateY] = useState(() => new Animated.Value(0));
   const [scale] = useState(() => new Animated.Value(1));
   const [rotate] = useState(() => new Animated.Value(0));
-  const [opacity] = useState(() => new Animated.Value(1));
   const [starScale] = useState(() => new Animated.Value(0));
   const [starOpacity] = useState(() => new Animated.Value(0));
   const [phase] = useState(() => Math.floor(Math.random() * 420));
@@ -26,7 +25,6 @@ export function AnimalCharacter({ animal, state, size = 'regular', scaleMultipli
     translateY.stopAnimation();
     scale.stopAnimation();
     rotate.stopAnimation();
-    opacity.stopAnimation();
     starScale.stopAnimation();
     starOpacity.stopAnimation();
 
@@ -34,7 +32,6 @@ export function AnimalCharacter({ animal, state, size = 'regular', scaleMultipli
     translateY.setValue(0);
     scale.setValue(1);
     rotate.setValue(0);
-    opacity.setValue(state === 'idle' ? 0.72 : 1);
     starScale.setValue(0);
     starOpacity.setValue(0);
 
@@ -90,7 +87,7 @@ export function AnimalCharacter({ animal, state, size = 'regular', scaleMultipli
 
     animation?.start();
     return () => animation?.stop();
-  }, [opacity, phase, rotate, scale, starOpacity, starScale, state, tempo, translateX, translateY]);
+  }, [phase, rotate, scale, starOpacity, starScale, state, tempo, translateX, translateY]);
 
   const rotation = rotate.interpolate({ inputRange: [0, 1], outputRange: ['-2deg', '2deg'] });
 
@@ -98,7 +95,7 @@ export function AnimalCharacter({ animal, state, size = 'regular', scaleMultipli
     <View style={styles.wrap}>
       <Animated.View
         accessibilityLabel={`動物角色，狀態：${state}`}
-        style={{ opacity, transform: [{ translateX }, { translateY }, { rotate: rotation }, { scale }] }}
+        style={{ opacity: 1, transform: [{ translateX }, { translateY }, { rotate: rotation }, { scale }] }}
       >
         <Text
           style={[
