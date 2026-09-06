@@ -20,7 +20,8 @@ const TAIL = require('../../assets/characters/gray-cat/tail.png');
 const PAW_LEFT = require('../../assets/characters/gray-cat/paw_left.png');
 const PAW_RIGHT = require('../../assets/characters/gray-cat/paw_right.png');
 const EYES_CLOSED = require('../../assets/characters/gray-cat/eyes_closed.png');
-const EYES_OPEN = require('../../assets/characters/gray-cat/eyes_open.png');
+const EYE_OPEN_LEFT = require('../../assets/characters/gray-cat/eye_open_left.png');
+const EYE_OPEN_RIGHT = require('../../assets/characters/gray-cat/eye_open_right.png');
 
 export const GRAY_CAT_BASE_SIZE = 160;
 
@@ -159,12 +160,20 @@ export function GrayCatActor({
         <Image resizeMode="contain" source={HEAD} style={styles.image} />
 
         {state === 'help' ? (
-          <Image
-            pointerEvents="none"
-            resizeMode="contain"
-            source={EYES_OPEN}
-            style={styles.openEyes}
-          />
+          <>
+            <Image
+              pointerEvents="none"
+              resizeMode="contain"
+              source={EYE_OPEN_LEFT}
+              style={styles.openEyeLeft}
+            />
+            <Image
+              pointerEvents="none"
+              resizeMode="contain"
+              source={EYE_OPEN_RIGHT}
+              style={styles.openEyeRight}
+            />
+          </>
         ) : (
           <Image
             pointerEvents="none"
@@ -183,15 +192,21 @@ const styles = StyleSheet.create({
   part: { position: 'absolute' },
   image: { height: '100%', width: '100%' },
 
-  // eyes_open.png was generated on a full 1254x1254 canvas. If stretched to
-  // the whole head the eyes become huge. Shrink the whole overlay and center it.
-  openEyes: {
-    height: '50%',
-    left: '16%',
+  // Open eyes are separate assets so eye spacing can be tuned without
+  // stretching the eyeballs themselves.
+  openEyeLeft: {
+    height: '24%',
+    left: '21%',
     position: 'absolute',
-    top: '26%',
-    transform: [{ scaleX: 2.26 }],
-    width: '68%',
+    top: '30%',
+    width: '24%',
+  },
+  openEyeRight: {
+    height: '24%',
+    position: 'absolute',
+    right: '21%',
+    top: '30%',
+    width: '24%',
   },
   // eyes_closed.png uses a small 160x160 calibration canvas. It needs to sit
   // lower on the face than before.
