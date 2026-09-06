@@ -139,7 +139,7 @@ function Worker({
     >
       <View style={styles.workerBubbleRow}>
         {isGrayCat(member.animal)
-          ? <GrayCatActor showDebug={SHOW_GRAY_CAT_DEBUG} size={member.isMe ? 78 : 58} state={forceHelp ? 'help' : grayCatState(state)} />
+          ? <GrayCatActor showDebug={SHOW_GRAY_CAT_DEBUG} size={member.isMe ? 120 : 88} state={forceHelp ? 'help' : grayCatState(state)} />
           : <AnimalCharacter animal={member.animal} size={member.isMe ? 'large' : 'regular'} state={state} />}
         {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
       </View>
@@ -219,7 +219,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         <Text style={styles.sceneTask}>{task}</Text>
       </View>
 
-      <Worker member={me} state={myState} spot={{ left: '40%', top: 205 }} delay={120} forceHelp={askingHelp} />
+      <Worker member={me} state={myState} spot={{ left: '33%', top: 190 }} delay={120} forceHelp={askingHelp} />
       {helpers.slice(0, 5).map((member, index) => (
         <Worker key={member.id} member={member} spot={SPOTS[index]} delay={index * 170 + 80} />
       ))}
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   sceneTitlePill: { alignItems: 'center', backgroundColor: 'rgba(255,249,243,0.91)', borderRadius: 16, left: '27%', paddingHorizontal: 13, paddingVertical: 7, position: 'absolute', top: 177, width: '46%' },
   sceneTitle: { color: '#6B5142', fontSize: 11, fontWeight: '900' },
   sceneTask: { color: '#917465', fontSize: 9, marginTop: 2 },
-  worker: { alignItems: 'center', position: 'absolute', width: 86 },
+  worker: { alignItems: 'center', position: 'absolute', width: 126 },
   draggableWorker: { zIndex: 20 },
   workerBubbleRow: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'center' },
   namePill: { alignItems: 'center', backgroundColor: 'rgba(255,250,246,0.92)', borderRadius: 10, marginTop: 1, maxWidth: 84, paddingHorizontal: 6, paddingVertical: 3 },
