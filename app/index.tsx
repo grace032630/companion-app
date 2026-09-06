@@ -1,18 +1,50 @@
 import { Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
+import { useAuth } from '../lib/auth';
 import { useProfile } from '../lib/profile';
+import { fetchOwnActiveRoomSession } from '../lib/room-realtime';
 
 const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '洗澡', '整理帳單', '回覆訊息', '其他事項'];
 
 export default function HomeScreen() {
+  const { session } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const [task, setTask] = useState<string | null>(null);
+  const [checkingRoom, setCheckingRoom] = useState(true);
 
-  if (profileLoading) {
+  useEffect(() => {
+    if (profileLoading) return;
+    const userId = session?.user.id;
+    if (!userId || !profile) {
+      setCheckingRoom(false);
+      return;
+    }
+
+    let active = true;
+    setCheckingRoom(true);
+    void fetchOwnActiveRoomSession(userId)
+      .then((existing) => {
+        if (!active) return;
+        if (existing) {
+          router.replace('/room');
+          return;
+        }
+        setCheckingRoom(false);
+      })
+      .catch(() => {
+        if (active) setCheckingRoom(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profileLoading, Boolean(profile), session?.user.id]);
+
+  if (profileLoading || checkingRoom) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingWrap}>
