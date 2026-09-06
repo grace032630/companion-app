@@ -15,6 +15,7 @@ type RoomSceneProps = {
   quote?: string | null;
   askingHelp?: boolean;
   finished?: boolean;
+  elapsedTime?: string;
 };
 
 const SPOTS = [
@@ -157,7 +158,7 @@ function Worker({
   );
 }
 
-export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false }: RoomSceneProps) {
+export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false, elapsedTime = '00:00' }: RoomSceneProps) {
   return (
     <ImageBackground
       source={ROOM_DAY_BACKGROUND}
@@ -169,6 +170,10 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
       ]}
     >
       <View style={styles.sceneShade} />
+
+      <View pointerEvents="none" style={styles.roomTimerPill}>
+        <Text style={styles.roomTimerText}>{elapsedTime}</Text>
+      </View>
 
       <View style={styles.sceneTitlePill}>
         <Text style={styles.sceneTitle}>{finished ? '施工完成 ✨' : askingHelp ? '先卡一下 會有人來' : '大家正在施工'}</Text>
@@ -198,6 +203,26 @@ const styles = StyleSheet.create({
   sceneShade: { backgroundColor: 'rgba(53,35,23,0.04)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   sceneHelp: { borderColor: '#E19B78', borderWidth: 2 },
   sceneDone: { borderColor: '#E2C66A', borderWidth: 2 },
+  roomTimerPill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,249,243,0.90)',
+    borderColor: 'rgba(109,79,59,0.14)',
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 58,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    zIndex: 40,
+  },
+  roomTimerText: {
+    color: '#5F4A3E',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
   windowFrame: { backgroundColor: '#D9BFA9', borderColor: '#A98870', borderRadius: 20, borderWidth: 6, height: 150, left: 22, overflow: 'hidden', position: 'absolute', right: 22, top: 22 },
   sky: { flex: 1, overflow: 'hidden', position: 'relative' },
   daySky: { backgroundColor: '#BFE1F4' },
