@@ -33,12 +33,14 @@ function Worker({
   spot,
   delay = 0,
   forceHelp = false,
+  quote,
 }: {
   member: CrewMember;
   state?: AnimalAnimationState;
   spot: { left: `${number}%`; top: number };
   delay?: number;
   forceHelp?: boolean;
+  quote?: string | null;
 }) {
   const [walk] = useState(() => new Animated.Value(0));
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -129,11 +131,16 @@ function Worker({
         },
       ]}
     >
+      {member.isMe && quote ? (
+        <View pointerEvents="none" style={styles.followQuoteBubble}>
+          <Text numberOfLines={3} style={styles.followQuoteText}>{quote}</Text>
+        </View>
+      ) : null}
       <View style={styles.workerBubbleRow}>
         <AnimalCharacter
           animal={member.animal}
-          scaleMultiplier={2}
-          size={member.isMe ? 'large' : 'regular'}
+          scaleMultiplier={1.5}
+          size="regular"
           state={forceHelp ? 'idle' : state}
         />
         {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
@@ -220,12 +227,11 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         <Text style={styles.sceneTask}>{task}</Text>
       </View>
 
-      <Worker member={me} state={myState} spot={{ left: '30%', top: 275 }} delay={120} forceHelp={askingHelp} />
+      <Worker member={me} state={myState} spot={{ left: '30%', top: 275 }} delay={120} forceHelp={askingHelp} quote={quote} />
       {helpers.slice(0, 5).map((member, index) => (
         <Worker key={member.id} member={member} spot={SPOTS[index]} delay={index * 170 + 80} />
       ))}
 
-      {quote ? <View style={styles.quoteBubble}><Text style={styles.quoteText}>{quote}</Text></View> : null}
       {askingHelp && <View style={styles.helpSign}><Text style={styles.helpSignText}>！</Text></View>}
     </View>
   );
@@ -283,8 +289,23 @@ const styles = StyleSheet.create({
   nameText: { color: '#5F4A3E', fontSize: 9, fontWeight: '800' },
   npcTag: { color: '#947B6D', fontSize: 6, marginTop: 1 },
   reaction: { fontSize: 18, position: 'absolute', right: -1, top: -10 },
-  quoteBubble: { backgroundColor: '#FFFFFF', borderRadius: 14, left: 112, maxWidth: 170, paddingHorizontal: 10, paddingVertical: 7, position: 'absolute', top: 285 },
-  quoteText: { color: '#6B5548', fontSize: 10, lineHeight: 14 },
+  followQuoteBubble: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E8D8CB',
+    borderRadius: 14,
+    borderWidth: 1,
+    bottom: '100%',
+    left: '50%',
+    marginBottom: 6,
+    maxWidth: 170,
+    minWidth: 90,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    position: 'absolute',
+    transform: [{ translateX: -45 }],
+    zIndex: 30,
+  },
+  followQuoteText: { color: '#6B5548', fontSize: 10, lineHeight: 14, textAlign: 'center' },
   helpSign: { alignItems: 'center', backgroundColor: '#FFCFB8', borderRadius: 15, height: 30, justifyContent: 'center', left: '47%', position: 'absolute', top: 244, width: 30 },
   helpSignText: { color: '#8B4B34', fontSize: 18, fontWeight: '900' },
 });
