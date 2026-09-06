@@ -2,9 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
 
 import type { AnimalAnimationState, CrewMember } from '../types/crew';
-import { isGrayCat } from '../constants/crew';
 import { AnimalCharacter } from './AnimalCharacter';
-import { GrayCatActor, type GrayCatActorState } from './actors/GrayCatActor';
 import { ConstructionAction } from './ConstructionAction';
 
 type RoomSceneProps = {
@@ -24,12 +22,6 @@ const SPOTS = [
   { left: '58%', top: 282 },
   { left: '38%', top: 345 },
 ] as const;
-
-const SHOW_GRAY_CAT_DEBUG = false;
-
-function grayCatState(state: AnimalAnimationState): GrayCatActorState {
-  return state === 'punched' ? 'hit' : state;
-}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -138,9 +130,11 @@ function Worker({
       ]}
     >
       <View style={styles.workerBubbleRow}>
-        {isGrayCat(member.animal)
-          ? <GrayCatActor showDebug={SHOW_GRAY_CAT_DEBUG} size={member.isMe ? 120 : 88} state={forceHelp ? 'help' : grayCatState(state)} />
-          : <AnimalCharacter animal={member.animal} size={member.isMe ? 'large' : 'regular'} state={state} />}
+        <AnimalCharacter
+          animal={member.animal}
+          size={member.isMe ? 'large' : 'regular'}
+          state={forceHelp ? 'idle' : state}
+        />
         {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
       </View>
       <View style={[styles.namePill, member.isMe && styles.meNamePill]}>
