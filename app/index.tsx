@@ -60,6 +60,7 @@ export default function HomeScreen() {
 
         <View style={styles.hero}>
           <Text style={styles.prompt}>現在想做什麼呢？^^</Text>
+          <Text style={styles.promptSub}>大家一起做事吧</Text>
           <View style={styles.companions}>
             <Text style={styles.companion}>🦊</Text>
             <Text style={styles.companion}>🐰</Text>
@@ -114,7 +115,8 @@ const styles = StyleSheet.create({
   avatarPressed: { opacity: 0.65, transform: [{ scale: 0.96 }] },
   hero: { backgroundColor: 'rgba(255,255,255,0.86)', borderColor: 'rgba(240,222,208,0.95)', borderRadius: 28, borderWidth: 1, marginBottom: 28, marginTop: 28, padding: 26, shadowColor: '#795E4B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.10, shadowRadius: 18 },
   prompt: { color: '#493D34', fontSize: 29, fontWeight: '700', lineHeight: 40 },
-  companions: { flexDirection: 'row', marginTop: 22 },
+  promptSub: { color: '#8B776A', fontSize: 13, marginTop: 4 },
+  companions: { flexDirection: 'row', marginTop: 18 },
   companion: { fontSize: 30, marginRight: 9 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: { backgroundColor: 'rgba(255,249,242,0.90)', borderColor: '#E3CDBB', borderRadius: 18, borderWidth: 1, paddingHorizontal: 15, paddingVertical: 11 },
