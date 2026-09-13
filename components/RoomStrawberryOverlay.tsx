@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAudioPlayer } from 'expo-audio';
 import { Platform, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 
 import {
@@ -12,51 +13,26 @@ import { supabase } from '../lib/supabase';
 
 type Props = {
   roomId: string;
+  soundEnabled?: boolean;
 };
 
-function playPickupFeedback() {
-  Vibration.vibrate(35);
+const PICKUP_SOUND = require('../assets/audio/strawberry-pickup.wav');
 
-  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-
-  try {
-    const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextCtor) return;
-
-    const context = new AudioContextCtor();
-    const gain = context.createGain();
-    const first = context.createOscillator();
-    const second = context.createOscillator();
-    const now = context.currentTime;
-
-    first.type = 'sine';
-    first.frequency.setValueAtTime(740, now);
-    second.type = 'sine';
-    second.frequency.setValueAtTime(980, now + 0.07);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-
-    first.connect(gain);
-    second.connect(gain);
-    gain.connect(context.destination);
-
-    first.start(now);
-    first.stop(now + 0.12);
-    second.start(now + 0.07);
-    second.stop(now + 0.22);
-
-    window.setTimeout(() => void context.close(), 320);
-  } catch {
-    // Sound feedback is optional; pickup should still succeed.
-  }
+function playLightHaptic() {
+  // Keep pickup feedback much lighter than support/punch feedback.
+  if (Platform.OS === 'android') Vibration.vibrate(10);
+  else if (Platform.OS === 'ios') Vibration.vibrate(1);
 }
 
-export function RoomStrawberryOverlay({ roomId }: Props) {
+export function RoomStrawberryOverlay({ roomId, soundEnabled = true }: Props) {
   const [berries, setBerries] = useState<RoomStrawberry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const pickupPlayer = useAudioPlayer(PICKUP_SOUND);
+
+  useEffect(() => {
+    pickupPlayer.volume = 0.55;
+  }, [pickupPlayer]);
 
   useEffect(() => {
     let active = true;
@@ -93,6 +69,17 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
   const showMessage = (text: string, duration: number) => {
     setMessage(text);
     setTimeout(() => setMessage(null), duration);
+  };
+
+  const playPickupFeedback = () => {
+    playLightHaptic();
+    if (!soundEnabled) return;
+    try {
+      pickupPlayer.seekTo(0);
+      pickupPlayer.play();
+    } catch {
+      // Sound is optional; claiming the strawberry must still succeed.
+    }
   };
 
   const handleClaim = async (berry: RoomStrawberry) => {
@@ -141,8 +128,6 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // This component now lives inside roomSceneWrap, so only compensate for
-  // RoomScene's own 16px top margin. It otherwise shares the exact room bounds.
   overlay: {
     borderRadius: 28,
     height: 610,
