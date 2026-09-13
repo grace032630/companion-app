@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { ANIMAL_OPTIONS } from '../constants/crew';
-import { checkInToday, fetchActivitySummary, type ActivitySummary } from '../lib/activity';
+import { checkInToday, fetchActivitySummary, fetchTaskCompletionCount, type ActivitySummary } from '../lib/activity';
 import { useAuth } from '../lib/auth';
 import { MAX_QUOTE_LENGTH, validatePublicQuote } from '../lib/content-filter';
 import {
@@ -26,6 +26,7 @@ import {
   type Friend,
 } from '../lib/friends';
 import { LANGUAGE_OPTIONS } from '../lib/i18n';
+import { getLevelProgress } from '../lib/levels';
 import { useProfile, type AppLanguage } from '../lib/profile';
 import { claimDailyStrawberry, fetchStrawberryTotal } from '../lib/strawberries';
 import { supabase } from '../lib/supabase';
@@ -42,6 +43,7 @@ export default function ProfileScreen() {
   const { session } = useAuth();
   const { profile, saveProfile } = useProfile();
   const [summary, setSummary] = useState<ActivitySummary>(EMPTY_SUMMARY);
+  const [totalCompleted, setTotalCompleted] = useState(0);
   const [strawberryTotal, setStrawberryTotal] = useState(0);
   const [strawberryOpen, setStrawberryOpen] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(true);
@@ -57,6 +59,7 @@ export default function ProfileScreen() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pendingFriendCount, setPendingFriendCount] = useState(0);
   const [loadingFriends, setLoadingFriends] = useState(true);
+  const levelInfo = getLevelProgress(totalCompleted);
 
   useEffect(() => {
     setNickname(profile?.nickname ?? '');
@@ -70,8 +73,12 @@ export default function ProfileScreen() {
     if (!userId) return;
     setLoadingSummary(true);
     try {
-      const nextSummary = await fetchActivitySummary(userId);
+      const [nextSummary, nextTotalCompleted] = await Promise.all([
+        fetchActivitySummary(userId),
+        fetchTaskCompletionCount(userId),
+      ]);
       setSummary(nextSummary);
+      setTotalCompleted(nextTotalCompleted);
       try {
         if (nextSummary.todayCompleted > 0) {
           const claimed = await claimDailyStrawberry();
@@ -83,6 +90,7 @@ export default function ProfileScreen() {
       }
     } catch {
       setSummary(EMPTY_SUMMARY);
+      setTotalCompleted(0);
     } finally {
       setLoadingSummary(false);
     }
@@ -211,10 +219,20 @@ export default function ProfileScreen() {
               <Text style={styles.name}>{profile.nickname}</Text>
               <View style={styles.profilePillsRow}>
                 <View style={styles.levelPill}>
-                  <Text style={styles.levelText}>施工 {summary.todayCompleted + summary.weekCompleted} 次</Text>
+                  <Text style={styles.levelText}>Lv.{levelInfo.level} · {levelInfo.title}</Text>
                 </View>
                 <View style={styles.strawberryPill}>
                   <Text style={styles.strawberryPillText}>🍓 {strawberryTotal}</Text>
+                </View>
+              </View>
+
+              <View style={styles.profileLevelProgress}>
+                <View style={styles.profileLevelHeader}>
+                  <Text style={styles.profileLevelCount}>{levelInfo.completedInLevel}/20</Text>
+                  <Text style={styles.profileLevelHint}>再完成 {levelInfo.remaining} 次升級</Text>
+                </View>
+                <View style={styles.profileLevelTrack}>
+                  <View style={[styles.profileLevelFill, { width: `${levelInfo.progress * 100}%` }]} />
                 </View>
               </View>
 
@@ -331,14 +349,18 @@ export default function ProfileScreen() {
                 <Text style={styles.friendPreviewEmpty}>還沒有好友，去邀請施工夥伴吧～</Text>
               ) : (
                 <View style={styles.friendPreviewList}>
-                  {friends.slice(0, 3).map((friend) => (
-                    <View key={friend.userId} style={styles.friendPreviewPerson}>
-                      <View style={styles.friendPreviewCharacter}>
-                        <AnimalCharacter animal={friend.animal} size="small" state="idle" />
+                  {friends.slice(0, 3).map((friend) => {
+                    const friendLevel = getLevelProgress(friend.totalCompletions);
+                    return (
+                      <View key={friend.userId} style={styles.friendPreviewPerson}>
+                        <View style={styles.friendPreviewCharacter}>
+                          <AnimalCharacter animal={friend.animal} size="small" state="idle" />
+                        </View>
+                        <Text numberOfLines={1} style={styles.friendPreviewName}>{friend.nickname}</Text>
+                        <Text style={styles.friendPreviewLevel}>Lv.{friendLevel.level}</Text>
                       </View>
-                      <Text numberOfLines={1} style={styles.friendPreviewName}>{friend.nickname}</Text>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </Pressable>
@@ -437,6 +459,12 @@ const styles = StyleSheet.create({
   levelText: { color: '#7A583F', fontSize: 11, fontWeight: '800' },
   strawberryPill: { backgroundColor: 'rgba(255,232,235,0.94)', borderColor: '#E9B9C1', borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
   strawberryPillText: { color: '#A54F61', fontSize: 11, fontWeight: '900' },
+  profileLevelProgress: { marginTop: 10, width: '78%' },
+  profileLevelHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  profileLevelCount: { color: '#7A583F', fontSize: 10, fontWeight: '900' },
+  profileLevelHint: { color: '#927565', fontSize: 10, fontWeight: '700' },
+  profileLevelTrack: { backgroundColor: 'rgba(219,193,172,0.75)', borderRadius: 99, height: 7, marginTop: 5, overflow: 'hidden' },
+  profileLevelFill: { backgroundColor: '#C88E69', borderRadius: 99, height: '100%' },
   speechBubble: { backgroundColor: 'rgba(255,255,255,0.92)', borderColor: '#E7D8CC', borderRadius: 15, borderWidth: 1, marginTop: 10, maxWidth: '88%', paddingHorizontal: 13, paddingVertical: 9 },
   quote: { color: '#735D50', fontSize: 13, textAlign: 'center' },
   editButton: { backgroundColor: 'rgba(255,255,255,0.92)', borderColor: '#E7D8CC', borderRadius: 14, borderWidth: 1, marginTop: 16, paddingHorizontal: 16, paddingVertical: 10 },
@@ -484,6 +512,7 @@ const styles = StyleSheet.create({
   friendPreviewPerson: { alignItems: 'center', flex: 1, minWidth: 0 },
   friendPreviewCharacter: { alignItems: 'center', backgroundColor: '#FFF7EF', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   friendPreviewName: { color: '#674F41', fontSize: 11, fontWeight: '800', marginTop: 5, maxWidth: '100%' },
+  friendPreviewLevel: { color: '#A06F50', fontSize: 9, fontWeight: '900', marginTop: 2 },
   friendPreviewEmpty: { color: '#9C897B', fontSize: 12, marginTop: 13, textAlign: 'center' },
   logCard: { backgroundColor: '#FFFFFF', borderColor: '#E9D9CD', borderRadius: 22, borderWidth: 1, padding: 18 },
   emptyText: { color: '#9C897B', fontSize: 13, lineHeight: 20, textAlign: 'center' },
