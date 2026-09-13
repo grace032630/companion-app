@@ -1,5 +1,6 @@
 -- Premium characters unlocked with earned strawberries.
--- The database calculates the balance and performs the purchase atomically.
+-- Selecting a locked premium character in the existing profile picker purchases
+-- it atomically for 500 strawberries; unlocked characters remain free to reuse.
 
 begin;
 
@@ -37,35 +38,21 @@ begin
   if v_user_id is null then raise exception 'NOT_AUTHENTICATED'; end if;
   if p_animal not in ('🐨','🦁','🐺','🦝') then raise exception 'INVALID_CHARACTER'; end if;
 
-  perform pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended(v_user_id::text || ':character-unlock', 130913)
-  );
-
-  if exists (
-    select 1 from public.character_unlocks
-    where user_id = v_user_id and animal = p_animal
-  ) then
-    select
-      (select count(*) from public.daily_strawberries where user_id = v_user_id)
-      + (select count(*) from public.friend_strawberry_gifts where recipient_id = v_user_id)
-      + (select count(*) from public.strawberry_pickups where user_id = v_user_id)
-      - coalesce((select sum(price_paid) from public.character_unlocks where user_id = v_user_id), 0)
-    into v_balance;
-    return greatest(v_balance, 0);
-  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_user_id::text || ':character-unlock', 130913));
 
   select
     (select count(*) from public.daily_strawberries where user_id = v_user_id)
     + (select count(*) from public.friend_strawberry_gifts where recipient_id = v_user_id)
-    + (select count(*) from public.strawberry_pickups where user_id = v_user_id)
-  into v_earned;
-
-  select coalesce(sum(price_paid), 0)
-  into v_spent
-  from public.character_unlocks
-  where user_id = v_user_id;
+    + (select count(*) from public.strawberry_pickups where user_id = v_user_id),
+    coalesce((select sum(price_paid) from public.character_unlocks where user_id = v_user_id), 0)
+  into v_earned, v_spent;
 
   v_balance := v_earned - v_spent;
+
+  if exists (select 1 from public.character_unlocks where user_id = v_user_id and animal = p_animal) then
+    return greatest(v_balance, 0);
+  end if;
+
   if v_balance < v_price then raise exception 'NOT_ENOUGH_STRAWBERRIES'; end if;
 
   insert into public.character_unlocks(user_id, animal, price_paid)
@@ -78,20 +65,40 @@ $$;
 revoke execute on function public.unlock_character(text) from public, anon, authenticated;
 grant execute on function public.unlock_character(text) to authenticated;
 
--- Prevent bypassing the unlock UI by directly updating profiles.animal.
+-- The normal profile save is also protected. If the user chooses a locked
+-- premium animal there, the same 500-strawberry purchase happens in this DB
+-- transaction, so bypassing the UI cannot create a free unlock.
 create or replace function public.enforce_character_unlock()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_earned integer := 0;
+  v_spent integer := 0;
+  v_balance integer := 0;
 begin
-  if new.animal in ('🐨','🦁','🐺','🦝') and not exists (
-    select 1 from public.character_unlocks
-    where user_id = new.user_id and animal = new.animal
-  ) then
-    raise exception 'CHARACTER_LOCKED';
-  end if;
+  if new.animal not in ('🐨','🦁','🐺','🦝') then return new; end if;
+  if exists (select 1 from public.character_unlocks where user_id = new.user_id and animal = new.animal) then return new; end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(new.user_id::text || ':character-unlock', 130913));
+
+  if exists (select 1 from public.character_unlocks where user_id = new.user_id and animal = new.animal) then return new; end if;
+
+  select
+    (select count(*) from public.daily_strawberries where user_id = new.user_id)
+    + (select count(*) from public.friend_strawberry_gifts where recipient_id = new.user_id)
+    + (select count(*) from public.strawberry_pickups where user_id = new.user_id),
+    coalesce((select sum(price_paid) from public.character_unlocks where user_id = new.user_id), 0)
+  into v_earned, v_spent;
+
+  v_balance := v_earned - v_spent;
+  if v_balance < 500 then raise exception 'NOT_ENOUGH_STRAWBERRIES'; end if;
+
+  insert into public.character_unlocks(user_id, animal, price_paid)
+  values (new.user_id, new.animal, 500);
+
   return new;
 end;
 $$;
