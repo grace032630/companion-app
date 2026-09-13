@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
-export const CHARACTER_UNLOCK_PRICE = 500;
+// Temporary MVP testing price. Restore to 500 before release.
+export const CHARACTER_UNLOCK_PRICE = 10;
 
 export async function claimDailyStrawberry() {
   const { data, error } = await supabase.rpc('claim_daily_strawberry');
