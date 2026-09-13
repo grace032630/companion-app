@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 
 import {
   claimRoomStrawberry,
@@ -13,6 +13,45 @@ import { supabase } from '../lib/supabase';
 type Props = {
   roomId: string;
 };
+
+function playPickupFeedback() {
+  Vibration.vibrate(35);
+
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+  try {
+    const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    const context = new AudioContextCtor();
+    const gain = context.createGain();
+    const first = context.createOscillator();
+    const second = context.createOscillator();
+    const now = context.currentTime;
+
+    first.type = 'sine';
+    first.frequency.setValueAtTime(740, now);
+    second.type = 'sine';
+    second.frequency.setValueAtTime(980, now + 0.07);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+    first.connect(gain);
+    second.connect(gain);
+    gain.connect(context.destination);
+
+    first.start(now);
+    first.stop(now + 0.12);
+    second.start(now + 0.07);
+    second.stop(now + 0.22);
+
+    window.setTimeout(() => void context.close(), 320);
+  } catch {
+    // Sound feedback is optional; pickup should still succeed.
+  }
+}
 
 export function RoomStrawberryOverlay({ roomId }: Props) {
   const [berries, setBerries] = useState<RoomStrawberry[]>([]);
@@ -62,8 +101,12 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
     try {
       const claimed = await claimRoomStrawberry(berry.id);
       setBerries((current) => current.filter((item) => item.id !== berry.id));
-      if (claimed) showMessage('🍓 撿到草莓 +1', 1300);
-      else showMessage('被別人搶先撿走了！', 1100);
+      if (claimed) {
+        playPickupFeedback();
+        showMessage('🍓 撿到草莓 +1', 1300);
+      } else {
+        showMessage('被別人搶先撿走了！', 1100);
+      }
     } catch {
       showMessage('剛剛沒撿到，再試一次～', 1100);
     } finally {
@@ -98,19 +141,16 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // app/room.tsx currently renders this overlay above the page rather than as
-  // a child of RoomScene. These bounds exactly match RoomScene's current
-  // geometry: page horizontal padding 14, content top 10, 42px header,
-  // 16px scene margin, and 610px scene height. Berry x/y percentages are now
-  // interpreted in the same visual coordinate box as the characters.
+  // This component now lives inside roomSceneWrap, so only compensate for
+  // RoomScene's own 16px top margin. It otherwise shares the exact room bounds.
   overlay: {
     borderRadius: 28,
     height: 610,
-    left: 14,
+    left: 0,
     overflow: 'hidden',
     position: 'absolute',
-    right: 14,
-    top: 68,
+    right: 0,
+    top: 16,
     zIndex: 100,
   },
   berry: {
@@ -121,6 +161,7 @@ const styles = StyleSheet.create({
     marginTop: -25,
     position: 'absolute',
     width: 50,
+    zIndex: 110,
   },
   berryPressed: {
     opacity: 0.65,
@@ -134,16 +175,19 @@ const styles = StyleSheet.create({
   },
   toast: {
     alignSelf: 'center',
-    backgroundColor: 'rgba(78,64,55,0.90)',
+    backgroundColor: 'rgba(78,64,55,0.94)',
+    borderColor: 'rgba(255,255,255,0.28)',
     borderRadius: 16,
-    bottom: 18,
+    borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 9,
     position: 'absolute',
+    top: 82,
+    zIndex: 300,
   },
   toastText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '900',
   },
 });
