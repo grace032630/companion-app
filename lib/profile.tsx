@@ -70,7 +70,10 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       if (language !== undefined) payload.language = language;
 
       const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'user_id' });
-      if (error) return { error: error.message };
+      if (error) {
+        if (error.message.includes('NOT_ENOUGH_STRAWBERRIES')) return { error: '草莓不夠～這隻角色需要 500 🍓 解鎖' };
+        return { error: error.message };
+      }
       await refreshProfile();
       return { error: null };
     },
