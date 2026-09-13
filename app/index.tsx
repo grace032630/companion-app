@@ -9,7 +9,7 @@ import { parseRoomReturnTo, serializeRoomTarget } from '../lib/deep-link';
 import { useProfile } from '../lib/profile';
 import { fetchOwnActiveRoomSession } from '../lib/room-realtime';
 
-const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '洗澡', '整理帳單', '回覆訊息', '其他事項'];
+const TASKS = ['打掃', '寫報告', '讀書', '工作', '運動', '做家事', '整理東西', '洗澡', '整理帳單', '回覆訊息', '不滑手機', '起床', '不吃零食', '冥想', '其他事項'];
 
 export default function HomeScreen() {
   const { session } = useAuth();
