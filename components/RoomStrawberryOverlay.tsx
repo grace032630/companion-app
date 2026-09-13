@@ -24,24 +24,36 @@ export function RoomStrawberryOverlay() {
     if (!userId) return;
 
     let active = true;
-    void fetchOwnActiveRoomSession(userId)
-      .then((roomSession) => {
+    let attempts = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const findRoom = async () => {
+      try {
+        const roomSession = await fetchOwnActiveRoomSession(userId);
         if (!active) return;
-        setRoomId(roomSession?.room_id ?? null);
-      })
-      .catch(() => {
-        if (active) setRoomId(null);
-      });
+        if (roomSession?.room_id) {
+          setRoomId(roomSession.room_id);
+          return;
+        }
+      } catch {
+        // The room screen may still be creating its session.
+      }
+
+      attempts += 1;
+      if (active && attempts < 12) retryTimer = setTimeout(() => void findRoom(), 500);
+    };
+
+    void findRoom();
 
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [session?.user.id]);
 
   useEffect(() => {
     if (!roomId) return;
     let active = true;
-    let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
     const refresh = async () => {
       try {
@@ -56,8 +68,7 @@ export function RoomStrawberryOverlay() {
       try {
         await ensureRoomStrawberries();
       } catch {
-        // The room may still be finishing its initial join write. Realtime and
-        // the next refresh will still pick up berries once the session exists.
+        // If seeding races with room setup, the existing room data is still safe.
       }
       await refresh();
     };
@@ -67,28 +78,25 @@ export function RoomStrawberryOverlay() {
 
     return () => {
       active = false;
-      if (hideTimer) clearTimeout(hideTimer);
       void supabase.removeChannel(channel);
     };
   }, [roomId]);
+
+  const showMessage = (text: string, duration: number) => {
+    setMessage(text);
+    setTimeout(() => setMessage(null), duration);
+  };
 
   const handleClaim = async (berry: RoomStrawberry) => {
     if (claimingId) return;
     setClaimingId(berry.id);
     try {
       const claimed = await claimRoomStrawberry(berry.id);
-      if (claimed) {
-        setBerries((current) => current.filter((item) => item.id !== berry.id));
-        setMessage('🍓 撿到草莓 +1');
-        setTimeout(() => setMessage(null), 1300);
-      } else {
-        setBerries((current) => current.filter((item) => item.id !== berry.id));
-        setMessage('被別人搶先撿走了！');
-        setTimeout(() => setMessage(null), 1100);
-      }
+      setBerries((current) => current.filter((item) => item.id !== berry.id));
+      if (claimed) showMessage('🍓 撿到草莓 +1', 1300);
+      else showMessage('被別人搶先撿走了！', 1100);
     } catch {
-      setMessage('剛剛沒撿到，再試一次～');
-      setTimeout(() => setMessage(null), 1100);
+      showMessage('剛剛沒撿到，再試一次～', 1100);
     } finally {
       setClaimingId(null);
     }
@@ -128,7 +136,6 @@ const styles = StyleSheet.create({
   overlay: {
     bottom: 0,
     left: 0,
-    pointerEvents: 'box-none',
     position: 'absolute',
     right: 0,
     top: 0,
@@ -137,7 +144,6 @@ const styles = StyleSheet.create({
   playArea: {
     bottom: 150,
     left: 0,
-    pointerEvents: 'box-none',
     position: 'absolute',
     right: 0,
     top: 150,
