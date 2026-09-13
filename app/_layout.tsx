@@ -1,6 +1,7 @@
 import { Redirect, Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { RoomStrawberryOverlay } from '../components/RoomStrawberryOverlay';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { createRoomReturnTo, parseRoomReturnTo, serializeRoomTarget } from '../lib/deep-link';
 import { ProfileProvider } from '../lib/profile';
@@ -34,7 +35,12 @@ function RootNavigator() {
       : <Redirect href="/" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <View style={styles.root}>
+      <Stack screenOptions={{ headerShown: false }} />
+      {pathname === '/room' ? <RoomStrawberryOverlay /> : null}
+    </View>
+  );
 }
 
 export default function RootLayout() {
@@ -48,6 +54,9 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   loading: {
     alignItems: 'center',
     backgroundColor: '#FFF9F1',
