@@ -21,6 +21,20 @@ export async function fetchUnlockedCharacters(userId: string) {
 export async function unlockCharacter(animal: string) {
   const { data, error } = await supabase.rpc('unlock_character', { p_animal: animal });
   if (error) throw error;
+
+  // Unlocking a character should also make it the user's active character
+  // immediately, so the player does not need a second save/select step.
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const userId = authData.user?.id;
+  if (userId) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ animal, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    if (profileError) throw profileError;
+  }
+
   return typeof data === 'number' ? data : Number(data ?? 0);
 }
 
