@@ -11,12 +11,20 @@ const DAY_BACKGROUNDS = [
   require('../assets/backgrounds/room-day-3.png'),
   require('../assets/backgrounds/room-day-4.png'),
   require('../assets/backgrounds/room-day-5.png'),
+  require('../assets/backgrounds/room-day-6.png'),
+  require('../assets/backgrounds/room-day-7.png'),
+  require('../assets/backgrounds/room-day-8.png'),
+  require('../assets/backgrounds/room-day-9.png'),
 ];
 
 const NIGHT_BACKGROUNDS = [
   require('../assets/backgrounds/room-night-1.png'),
   require('../assets/backgrounds/room-night-2.png'),
   require('../assets/backgrounds/room-night-3.png'),
+  require('../assets/backgrounds/room-night-4.png'),
+  require('../assets/backgrounds/room-night-5.png'),
+  require('../assets/backgrounds/room-night-6.png'),
+  require('../assets/backgrounds/room-night-7.png'),
 ];
 
 function pickRoomBackground() {
