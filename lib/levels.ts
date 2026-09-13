@@ -5,13 +5,13 @@ const TITLES = [
   '開始動了',
   '行動派',
   '穩定施工中',
-  '拖延退散',
+  '拖延驅逐師',
   '施工隊長',
   '超級行動派',
   '任務終結者',
   '行動大師',
   '傳說中的執行者',
-  '不可能拖延的人',
+  '王',
 ] as const;
 
 export function getLevelFromCompletions(totalCompleted: number) {
