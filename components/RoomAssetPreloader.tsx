@@ -20,10 +20,17 @@ const ROOM_AUDIO = [
   require('../assets/audio/room-bgm-5.mp3'),
 ] as const;
 
-// expo-audio recommends preloading before the player is created. Importing this
-// module from the root layout starts warming the local BGM files immediately.
+// expo-audio may preload synchronously on some platforms (notably web), so do
+// not assume preload() returns a Promise.
 ROOM_AUDIO.forEach((source) => {
-  void preload(source).catch(() => undefined);
+  try {
+    const result = preload(source);
+    if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+      Promise.resolve(result).catch(() => undefined);
+    }
+  } catch {
+    // Preloading is only an optimization; room playback can still load normally.
+  }
 });
 
 export function RoomAssetPreloader() {
