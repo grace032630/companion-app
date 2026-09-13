@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
-import { ANIMAL_OPTIONS } from '../constants/crew';
+import { FREE_ANIMAL_OPTIONS } from '../constants/crew';
 import { parseRoomReturnTo } from '../lib/deep-link';
 import { useProfile } from '../lib/profile';
 
@@ -22,7 +22,7 @@ export default function ProfileSetupScreen() {
   const { profile, saveProfile } = useProfile();
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [nickname, setNickname] = useState(profile?.nickname ?? '');
-  const [animal, setAnimal] = useState<string>(profile?.animal ?? ANIMAL_OPTIONS[0]);
+  const [animal, setAnimal] = useState<string>(profile?.animal ?? FREE_ANIMAL_OPTIONS[0]);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -65,7 +65,7 @@ export default function ProfileSetupScreen() {
 
           <Text style={styles.sectionTitle}>選角色</Text>
           <View style={styles.animalGrid}>
-            {ANIMAL_OPTIONS.map((item) => {
+            {FREE_ANIMAL_OPTIONS.map((item) => {
               const selected = animal === item;
               return (
                 <Pressable
