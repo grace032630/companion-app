@@ -46,6 +46,16 @@ export async function recordTaskCompletion(roomSessionId: string) {
   });
 }
 
+export async function fetchTaskCompletionCount(userId: string) {
+  const { count, error } = await supabase
+    .from('task_completions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function fetchActivitySummary(userId: string): Promise<ActivitySummary> {
   const now = new Date();
   const todayKey = toDateKey(now);
