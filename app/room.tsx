@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalCharacter } from '../components/AnimalCharacter';
 import { RoomScene, type RoomCollision } from '../components/RoomScene';
 import { RoomStrawberryOverlay } from '../components/RoomStrawberryOverlay';
-import { ANIMAL_OPTIONS, CONSTRUCTION_ACTION_IDS, NAME_OPTIONS } from '../constants/crew';
+import { CONSTRUCTION_ACTION_IDS, FREE_ANIMAL_OPTIONS, NAME_OPTIONS } from '../constants/crew';
 import { recordTaskCompletion } from '../lib/activity';
 import { useAuth } from '../lib/auth';
 import { useProfile } from '../lib/profile';
@@ -58,7 +58,7 @@ type BoardItem={id:string;animal:string;name:string;text:string;kind:RoomStatus;
 function pick<T>(items:readonly T[]):T{return items[Math.floor(Math.random()*items.length)];}
 function shuffle<T>(items:readonly T[]):T[]{const copy=[...items];for(let i=copy.length-1;i>0;i-=1){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
 function isTask(value:unknown):value is Task{return typeof value==='string'&&TASKS.some((task)=>task===value);}
-function makeNpcPool():CrewMember[]{const actions=shuffle(CONSTRUCTION_ACTION_IDS);return Array.from({length:ROOM_CAPACITY-1},(_,index)=>({id:`npc-${index+1}`,animal:pick(ANIMAL_OPTIONS),name:pick(NAME_OPTIONS),action:actions[index%actions.length],isMe:false,isNpc:true}));}
+function makeNpcPool():CrewMember[]{const actions=shuffle(CONSTRUCTION_ACTION_IDS);return Array.from({length:ROOM_CAPACITY-1},(_,index)=>({id:`npc-${index+1}`,animal:pick(FREE_ANIMAL_OPTIONS),name:pick(NAME_OPTIONS),action:actions[index%actions.length],isMe:false,isNpc:true}));}
 function makeBoardItem(member:CrewMember,task:Task,kind:RoomStatus='working'):BoardItem{const text=kind==='done'?`完成了「${task}」 🎉`:kind==='help'?`做「${task}」卡住了，需要幫忙`:`正在做「${task}」`;return{id:member.id,animal:member.animal,name:member.name,text,kind,helper:Boolean(member.isNpc)};}
 function makeSessionBoardItem(session:RoomSession):BoardItem{return{...makeBoardItem(roomSessionToCrewMember(session),isTask(session.task)?session.task:'其他事項',session.status),targetUserId:session.user_id,requestId:session.help_request_id};}
 function boardState(kind:RoomStatus):AnimalAnimationState{return kind==='done'?'done':kind==='help'?'idle':'working';}
