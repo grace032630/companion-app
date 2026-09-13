@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useAuth } from '../lib/auth';
-import { fetchOwnActiveRoomSession } from '../lib/room-realtime';
 import {
   claimRoomStrawberry,
   ensureRoomStrawberries,
@@ -13,67 +11,22 @@ import {
 import { supabase } from '../lib/supabase';
 
 type Props = {
-  roomId?: string;
+  roomId: string;
 };
 
-export function RoomStrawberryOverlay({ roomId: roomIdProp }: Props) {
-  const { session } = useAuth();
-  const [roomId, setRoomId] = useState<string | null>(roomIdProp ?? null);
+export function RoomStrawberryOverlay({ roomId }: Props) {
   const [berries, setBerries] = useState<RoomStrawberry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (roomIdProp) {
-      setRoomId(roomIdProp);
-      return;
-    }
-
-    const userId = session?.user.id;
-    if (!userId) return;
-
-    let active = true;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempts = 0;
-
-    const findRoom = async () => {
-      try {
-        const roomSession = await fetchOwnActiveRoomSession(userId);
-        if (!active) return;
-        if (roomSession?.room_id) {
-          setRoomId(roomSession.room_id);
-          return;
-        }
-      } catch {
-        // The room screen may still be creating its room session.
-      }
-
-      attempts += 1;
-      if (active && attempts < 30) retryTimer = setTimeout(() => void findRoom(), 500);
-    };
-
-    void findRoom();
-
-    return () => {
-      active = false;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
-  }, [roomIdProp, session?.user.id]);
-
-  useEffect(() => {
-    if (!roomId) return;
-
     let active = true;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
 
     const refresh = async () => {
-      try {
-        const next = await fetchRoomStrawberries(roomId);
-        if (active) setBerries(next);
-      } catch {
-        if (active) setBerries([]);
-      }
+      const next = await fetchRoomStrawberries(roomId);
+      if (active) setBerries(next);
     };
 
     const seedAndRefresh = async () => {
@@ -82,14 +35,14 @@ export function RoomStrawberryOverlay({ roomId: roomIdProp }: Props) {
         await refresh();
       } catch {
         attempts += 1;
-        if (active && attempts < 30) {
-          retryTimer = setTimeout(() => void seedAndRefresh(), 500);
-        }
+        if (active && attempts < 30) retryTimer = setTimeout(() => void seedAndRefresh(), 500);
       }
     };
 
     void seedAndRefresh();
-    const channel = subscribeToRoomStrawberries(roomId, () => void refresh());
+    const channel = subscribeToRoomStrawberries(roomId, () => {
+      void refresh().catch(() => undefined);
+    });
 
     return () => {
       active = false;
@@ -117,8 +70,6 @@ export function RoomStrawberryOverlay({ roomId: roomIdProp }: Props) {
       setClaimingId(null);
     }
   };
-
-  if (!roomId) return null;
 
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
@@ -155,30 +106,30 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    zIndex: 50,
+    zIndex: 100,
   },
   playArea: {
-    bottom: 130,
+    bottom: 120,
     left: 0,
     position: 'absolute',
     right: 0,
-    top: 90,
+    top: 70,
   },
   berry: {
     alignItems: 'center',
-    height: 52,
+    height: 56,
     justifyContent: 'center',
-    marginLeft: -26,
-    marginTop: -26,
+    marginLeft: -28,
+    marginTop: -28,
     position: 'absolute',
-    width: 52,
+    width: 56,
   },
   berryPressed: {
     opacity: 0.65,
     transform: [{ scale: 0.86 }],
   },
   berryEmoji: {
-    fontSize: 38,
+    fontSize: 40,
     textShadowColor: 'rgba(80,45,35,0.22)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
