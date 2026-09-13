@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 
-// Temporary MVP testing price. Restore to 500 before release.
-export const CHARACTER_UNLOCK_PRICE = 10;
+export const CHARACTER_UNLOCK_PRICE = 500;
 
 export async function claimDailyStrawberry() {
   const { data, error } = await supabase.rpc('claim_daily_strawberry');
@@ -22,8 +21,6 @@ export async function unlockCharacter(animal: string) {
   const { data, error } = await supabase.rpc('unlock_character', { p_animal: animal });
   if (error) throw error;
 
-  // Unlocking a character should also make it the user's active character
-  // immediately, so the player does not need a second save/select step.
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   const userId = authData.user?.id;
