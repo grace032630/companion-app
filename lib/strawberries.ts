@@ -7,7 +7,7 @@ export async function claimDailyStrawberry() {
 }
 
 export async function fetchStrawberryTotal(userId: string) {
-  const [dailyResult, giftResult] = await Promise.all([
+  const [dailyResult, giftResult, roomPickupResult] = await Promise.all([
     supabase
       .from('daily_strawberries')
       .select('id', { count: 'exact', head: true })
@@ -16,9 +16,15 @@ export async function fetchStrawberryTotal(userId: string) {
       .from('friend_strawberry_gifts')
       .select('id', { count: 'exact', head: true })
       .eq('recipient_id', userId),
+    supabase
+      .from('strawberry_pickups')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
   ]);
 
   if (dailyResult.error) throw dailyResult.error;
   if (giftResult.error) throw giftResult.error;
-  return (dailyResult.count ?? 0) + (giftResult.count ?? 0);
+  if (roomPickupResult.error) throw roomPickupResult.error;
+
+  return (dailyResult.count ?? 0) + (giftResult.count ?? 0) + (roomPickupResult.count ?? 0);
 }
