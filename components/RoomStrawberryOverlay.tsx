@@ -73,23 +73,21 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
 
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
-      <View pointerEvents="box-none" style={styles.playArea}>
-        {berries.map((berry) => (
-          <Pressable
-            accessibilityLabel="撿草莓"
-            disabled={claimingId === berry.id}
-            key={berry.id}
-            onPress={() => void handleClaim(berry)}
-            style={({ pressed }) => [
-              styles.berry,
-              { left: `${berry.x_percent}%`, top: `${berry.y_percent}%` },
-              pressed && styles.berryPressed,
-            ]}
-          >
-            <Text style={styles.berryEmoji}>🍓</Text>
-          </Pressable>
-        ))}
-      </View>
+      {berries.map((berry) => (
+        <Pressable
+          accessibilityLabel="撿草莓"
+          disabled={claimingId === berry.id}
+          key={berry.id}
+          onPress={() => void handleClaim(berry)}
+          style={({ pressed }) => [
+            styles.berry,
+            { left: `${berry.x_percent}%`, top: `${berry.y_percent}%` },
+            pressed && styles.berryPressed,
+          ]}
+        >
+          <Text style={styles.berryEmoji}>🍓</Text>
+        </Pressable>
+      ))}
       {message ? (
         <View pointerEvents="none" style={styles.toast}>
           <Text style={styles.toastText}>{message}</Text>
@@ -108,28 +106,21 @@ const styles = StyleSheet.create({
     top: 0,
     zIndex: 100,
   },
-  playArea: {
-    bottom: 120,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 70,
-  },
   berry: {
     alignItems: 'center',
-    height: 56,
+    height: 50,
     justifyContent: 'center',
-    marginLeft: -28,
-    marginTop: -28,
+    marginLeft: -25,
+    marginTop: -25,
     position: 'absolute',
-    width: 56,
+    width: 50,
   },
   berryPressed: {
     opacity: 0.65,
     transform: [{ scale: 0.86 }],
   },
   berryEmoji: {
-    fontSize: 40,
+    fontSize: 34,
     textShadowColor: 'rgba(80,45,35,0.22)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
@@ -138,7 +129,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     backgroundColor: 'rgba(78,64,55,0.90)',
     borderRadius: 16,
-    bottom: 122,
+    bottom: 18,
     paddingHorizontal: 16,
     paddingVertical: 9,
     position: 'absolute',
