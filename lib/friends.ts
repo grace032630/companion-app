@@ -15,6 +15,7 @@ export type Friend = {
   publicFriendId: string;
   streak: number;
   checkedInToday: boolean;
+  totalCompletions: number;
 };
 
 export type FriendReminderResult = 'sent' | 'already_checked_in' | 'already_reminded';
@@ -37,6 +38,7 @@ type FriendRow = {
   public_friend_id: string;
   streak: number;
   checked_in_today: boolean;
+  total_completions: number | string;
 };
 
 function throwIfError(error: { message: string } | null) {
@@ -98,6 +100,7 @@ export async function fetchFriends(): Promise<Friend[]> {
     publicFriendId: row.public_friend_id,
     streak: Number(row.streak),
     checkedInToday: row.checked_in_today,
+    totalCompletions: Number(row.total_completions ?? 0),
   }));
 }
 
