@@ -19,7 +19,7 @@ import { claimDailyStrawberry } from '../lib/strawberries';
 import { supabase } from '../lib/supabase';
 import type { AnimalAnimationState, ConstructionActionId, CrewMember } from '../types/crew';
 
-const TASKS=['打掃','寫報告','讀書','工作','運動','做家事','整理東西','洗澡','整理帳單','回覆訊息','其他事項'] as const;
+const TASKS=['打掃','寫報告','讀書','工作','運動','做家事','整理東西','洗澡','整理帳單','回覆訊息','不滑手機','起床','不吃零食','冥想','其他事項'] as const;
 const SUPPORT_MESSAGES=[
   '欸~~都進來了~就差真的動手了！',
   '手機先放下 現在就行動',
