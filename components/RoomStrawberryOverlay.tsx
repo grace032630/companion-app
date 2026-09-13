@@ -98,12 +98,19 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // app/room.tsx currently renders this overlay above the page rather than as
+  // a child of RoomScene. These bounds exactly match RoomScene's current
+  // geometry: page horizontal padding 14, content top 10, 42px header,
+  // 16px scene margin, and 610px scene height. Berry x/y percentages are now
+  // interpreted in the same visual coordinate box as the characters.
   overlay: {
-    bottom: 0,
-    left: 0,
+    borderRadius: 28,
+    height: 610,
+    left: 14,
+    overflow: 'hidden',
     position: 'absolute',
-    right: 0,
-    top: 0,
+    right: 14,
+    top: 68,
     zIndex: 100,
   },
   berry: {
