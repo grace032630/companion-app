@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
-import { ANIMAL_OPTIONS } from '../constants/crew';
+import { ANIMAL_OPTIONS, isPremiumAnimal } from '../constants/crew';
 import { checkInToday, fetchActivitySummary, fetchTaskCompletionCount, type ActivitySummary } from '../lib/activity';
 import { useAuth } from '../lib/auth';
 import { MAX_QUOTE_LENGTH, validatePublicQuote } from '../lib/content-filter';
@@ -28,7 +28,13 @@ import {
 import { LANGUAGE_OPTIONS } from '../lib/i18n';
 import { getLevelProgress } from '../lib/levels';
 import { useProfile, type AppLanguage } from '../lib/profile';
-import { claimDailyStrawberry, fetchStrawberryTotal } from '../lib/strawberries';
+import {
+  CHARACTER_UNLOCK_PRICE,
+  claimDailyStrawberry,
+  fetchStrawberryTotal,
+  fetchUnlockedCharacters,
+  unlockCharacter,
+} from '../lib/strawberries';
 import { supabase } from '../lib/supabase';
 
 const EMPTY_SUMMARY: ActivitySummary = {
@@ -45,6 +51,8 @@ export default function ProfileScreen() {
   const [summary, setSummary] = useState<ActivitySummary>(EMPTY_SUMMARY);
   const [totalCompleted, setTotalCompleted] = useState(0);
   const [strawberryTotal, setStrawberryTotal] = useState(0);
+  const [unlockedCharacters, setUnlockedCharacters] = useState<string[]>([]);
+  const [unlockingAnimal, setUnlockingAnimal] = useState<string | null>(null);
   const [strawberryOpen, setStrawberryOpen] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -84,9 +92,14 @@ export default function ProfileScreen() {
           const claimed = await claimDailyStrawberry();
           if (claimed) setStrawberryOpen(true);
         }
-        setStrawberryTotal(await fetchStrawberryTotal(userId));
+        const [nextStrawberryTotal, nextUnlockedCharacters] = await Promise.all([
+          fetchStrawberryTotal(userId),
+          fetchUnlockedCharacters(userId),
+        ]);
+        setStrawberryTotal(nextStrawberryTotal);
+        setUnlockedCharacters(nextUnlockedCharacters);
       } catch {
-        // Strawberry rewards are optional until the migration has been applied.
+        // Strawberry rewards/unlocks are optional until their migrations are applied.
       }
     } catch {
       setSummary(EMPTY_SUMMARY);
@@ -125,6 +138,7 @@ export default function ProfileScreen() {
       };
 
       void loadFriendPreview();
+      void loadSummary();
       return () => {
         active = false;
       };
@@ -145,12 +159,46 @@ export default function ProfileScreen() {
     setCheckingIn(false);
   };
 
+  const handleAnimalPress = async (item: string) => {
+    const locked = isPremiumAnimal(item) && !unlockedCharacters.includes(item);
+    if (!locked) {
+      setAnimal(item);
+      return;
+    }
+
+    if (unlockingAnimal) return;
+    if (strawberryTotal < CHARACTER_UNLOCK_PRICE) {
+      setMessage(`還差 ${CHARACTER_UNLOCK_PRICE - strawberryTotal} 🍓 才能解鎖`);
+      return;
+    }
+
+    setUnlockingAnimal(item);
+    setMessage(null);
+    try {
+      const nextBalance = await unlockCharacter(item);
+      setUnlockedCharacters((current) => current.includes(item) ? current : [...current, item]);
+      setStrawberryTotal(nextBalance);
+      setAnimal(item);
+      setMessage('角色解鎖成功！');
+    } catch (error: unknown) {
+      const text = error instanceof Error ? error.message : '';
+      if (text.includes('NOT_ENOUGH_STRAWBERRIES')) setMessage('草莓不夠～需要 500 🍓 解鎖');
+      else setMessage('剛剛沒有解鎖成功，再試一次');
+    } finally {
+      setUnlockingAnimal(null);
+    }
+  };
+
   const handleSave = async () => {
     const cleaned = nickname.trim();
     if (!cleaned) return setMessage('暱稱不能空白');
     if (cleaned.length > 16) return setMessage('暱稱最多 16 個字');
     const checked = validatePublicQuote(quote);
     if (!checked.ok) return setMessage(checked.message);
+
+    if (isPremiumAnimal(animal) && !unlockedCharacters.includes(animal)) {
+      return setMessage('這隻角色還沒解鎖');
+    }
 
     setSaving(true);
     setMessage(null);
@@ -251,16 +299,30 @@ export default function ProfileScreen() {
               <View style={styles.editCard}>
                 <Text style={styles.sectionTitle}>換角色</Text>
                 <View style={styles.animalGrid}>
-                  {ANIMAL_OPTIONS.map((item) => (
-                    <Pressable
-                      key={item}
-                      onPress={() => setAnimal(item)}
-                      style={[styles.animalButton, animal === item && styles.animalSelected]}
-                    >
-                      <AnimalCharacter animal={item} size="regular" state="idle" />
-                      {animal === item ? <Text style={styles.selectedMark}>✓</Text> : null}
-                    </Pressable>
-                  ))}
+                  {ANIMAL_OPTIONS.map((item) => {
+                    const locked = isPremiumAnimal(item) && !unlockedCharacters.includes(item);
+                    const selected = animal === item;
+                    const unlocking = unlockingAnimal === item;
+                    return (
+                      <Pressable
+                        key={item}
+                        accessibilityLabel={locked ? `${item}，500 草莓解鎖` : `選擇角色 ${item}`}
+                        disabled={Boolean(unlockingAnimal) && !unlocking}
+                        onPress={() => void handleAnimalPress(item)}
+                        style={[styles.animalButton, selected && styles.animalSelected, locked && styles.animalLocked]}
+                      >
+                        <View style={locked ? styles.lockedAnimalVisual : undefined}>
+                          <AnimalCharacter animal={item} size="regular" state="idle" />
+                        </View>
+                        {locked ? (
+                          <View pointerEvents="none" style={styles.lockOverlay}>
+                            {unlocking ? <ActivityIndicator color="#7E6251" size="small" /> : <Text style={styles.lockIcon}>🔒</Text>}
+                            <Text style={styles.lockPrice}>500 🍓 解鎖</Text>
+                          </View>
+                        ) : selected ? <Text style={styles.selectedMark}>✓</Text> : null}
+                      </Pressable>
+                    );
+                  })}
                 </View>
 
                 <Text style={styles.sectionTitle}>改暱稱</Text>
@@ -472,8 +534,13 @@ const styles = StyleSheet.create({
   editCard: { backgroundColor: '#FFFFFF', borderColor: '#E8D6C8', borderRadius: 24, borderWidth: 1, marginTop: 14, padding: 18 },
   sectionTitle: { color: '#5C493D', fontSize: 14, fontWeight: '900', marginBottom: 10, marginTop: 12 },
   animalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  animalButton: { alignItems: 'center', backgroundColor: '#FFF9F4', borderColor: '#E8D8CB', borderRadius: 18, borderWidth: 1, height: 72, justifyContent: 'center', position: 'relative', width: '22%' },
+  animalButton: { alignItems: 'center', backgroundColor: '#FFF9F4', borderColor: '#E8D8CB', borderRadius: 18, borderWidth: 1, height: 82, justifyContent: 'center', overflow: 'hidden', position: 'relative', width: '22%' },
   animalSelected: { backgroundColor: '#F7DED0', borderColor: '#B97855', borderWidth: 2 },
+  animalLocked: { backgroundColor: '#EEEAE7', borderColor: '#D8CEC7' },
+  lockedAnimalVisual: { opacity: 0.18 },
+  lockOverlay: { alignItems: 'center', backgroundColor: 'rgba(239,234,230,0.58)', bottom: 0, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
+  lockIcon: { fontSize: 14, marginBottom: 3 },
+  lockPrice: { color: '#6D574A', fontSize: 9, fontWeight: '900', textAlign: 'center' },
   selectedMark: { backgroundColor: '#A86F4D', borderRadius: 9, color: '#FFFFFF', fontSize: 9, fontWeight: '900', height: 18, lineHeight: 18, position: 'absolute', right: 5, textAlign: 'center', top: 5, width: 18 },
   input: { backgroundColor: '#FFF9F4', borderColor: '#E3CFC0', borderRadius: 16, borderWidth: 1, color: '#493D34', fontSize: 16, minHeight: 52, paddingHorizontal: 15, paddingVertical: 12 },
   quoteInput: { minHeight: 76, textAlignVertical: 'top' },
