@@ -2,7 +2,13 @@ import type { ConstructionActionId } from '../types/crew';
 
 export const GRAY_CAT_ANIMAL = '🐱' as const;
 
-export const ANIMAL_OPTIONS = [GRAY_CAT_ANIMAL, '🐶', '🐰', '🦊', '🐻', '🐼', '🐹', '🐯'] as const;
+export const FREE_ANIMAL_OPTIONS = [GRAY_CAT_ANIMAL, '🐶', '🐰', '🦊', '🐻', '🐼', '🐹', '🐯'] as const;
+export const PREMIUM_ANIMAL_OPTIONS = ['🐨', '🦁', '🐺', '🦝'] as const;
+export const ANIMAL_OPTIONS = [...FREE_ANIMAL_OPTIONS, ...PREMIUM_ANIMAL_OPTIONS] as const;
+
+export function isPremiumAnimal(animal: string): boolean {
+  return PREMIUM_ANIMAL_OPTIONS.some((item) => item === animal);
+}
 
 export function isGrayCat(animal: string): boolean {
   return animal === GRAY_CAT_ANIMAL;
