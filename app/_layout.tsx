@@ -1,6 +1,7 @@
 import { Redirect, Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { RoomAssetPreloader } from '../components/RoomAssetPreloader';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { createRoomReturnTo, parseRoomReturnTo, serializeRoomTarget } from '../lib/deep-link';
 import { ProfileProvider } from '../lib/profile';
@@ -41,13 +42,19 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <ProfileProvider>
-        <RootNavigator />
+        <View style={styles.root}>
+          <RoomAssetPreloader />
+          <RootNavigator />
+        </View>
       </ProfileProvider>
     </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   loading: {
     alignItems: 'center',
     backgroundColor: '#FFF9F1',
