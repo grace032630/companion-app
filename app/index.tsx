@@ -4,10 +4,8 @@ import { ActivityIndicator, ImageBackground, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalCharacter } from '../components/AnimalCharacter';
-import { fetchTaskCompletionCount } from '../lib/activity';
 import { useAuth } from '../lib/auth';
 import { parseRoomReturnTo, serializeRoomTarget } from '../lib/deep-link';
-import { getLevelProgress } from '../lib/levels';
 import { useProfile } from '../lib/profile';
 import { fetchOwnActiveRoomSession } from '../lib/room-realtime';
 
@@ -20,8 +18,6 @@ export default function HomeScreen() {
   const postLoginTarget = parseRoomReturnTo(params.returnTo);
   const [task, setTask] = useState<string | null>(null);
   const [checkingRoom, setCheckingRoom] = useState(true);
-  const [totalCompleted, setTotalCompleted] = useState(0);
-  const levelInfo = getLevelProgress(totalCompleted);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -50,24 +46,6 @@ export default function HomeScreen() {
       active = false;
     };
   }, [profileLoading, Boolean(profile), session?.user.id]);
-
-  useEffect(() => {
-    const userId = session?.user.id;
-    if (!userId) return;
-
-    let active = true;
-    void fetchTaskCompletionCount(userId)
-      .then((count) => {
-        if (active) setTotalCompleted(count);
-      })
-      .catch(() => {
-        if (active) setTotalCompleted(0);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [session?.user.id]);
 
   if (profileLoading || checkingRoom) {
     return (
@@ -107,16 +85,9 @@ export default function HomeScreen() {
           style={styles.scrollView}
         >
           <View style={styles.topRow}>
-            <View style={styles.identityCopy}>
+            <View>
               <Text style={styles.brand}>Companion</Text>
               <Text style={styles.nickname}>嗨 {profile.nickname}</Text>
-              <View style={styles.levelRow}>
-                <Text style={styles.levelLabel}>Lv.{levelInfo.level} · {levelInfo.title}</Text>
-                <Text style={styles.levelCount}>{levelInfo.completedInLevel}/20</Text>
-              </View>
-              <View style={styles.levelTrack}>
-                <View style={[styles.levelFill, { width: `${levelInfo.progress * 100}%` }]} />
-              </View>
             </View>
             <Pressable
               accessibilityLabel="打開我的資料"
@@ -177,14 +148,8 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 20 },
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  identityCopy: { flex: 1, marginRight: 18 },
   brand: { color: '#493D34', fontSize: 24, fontWeight: '700' },
   nickname: { color: '#8A7A6E', fontSize: 13, marginTop: 4 },
-  levelRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, maxWidth: 220 },
-  levelLabel: { color: '#7A583F', fontSize: 11, fontWeight: '800' },
-  levelCount: { color: '#9A877A', fontSize: 10, fontWeight: '700' },
-  levelTrack: { backgroundColor: 'rgba(223,202,185,0.8)', borderRadius: 99, height: 6, marginTop: 5, maxWidth: 220, overflow: 'hidden' },
-  levelFill: { backgroundColor: '#C88E69', borderRadius: 99, height: '100%' },
   avatar: { alignItems: 'center', backgroundColor: '#F4E1CF', borderColor: '#E7CEBA', borderRadius: 24, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
   avatarPressed: { opacity: 0.65, transform: [{ scale: 0.96 }] },
   hero: { backgroundColor: 'rgba(255,255,255,0.86)', borderColor: 'rgba(240,222,208,0.95)', borderRadius: 28, borderWidth: 1, marginBottom: 28, marginTop: 28, padding: 26, shadowColor: '#795E4B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.10, shadowRadius: 18 },
