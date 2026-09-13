@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useAuth } from '../lib/auth';
+import { fetchOwnActiveRoomSession } from '../lib/room-realtime';
 import {
   claimRoomStrawberry,
   ensureRoomStrawberries,
@@ -11,15 +13,56 @@ import {
 import { supabase } from '../lib/supabase';
 
 type Props = {
-  roomId: string;
+  roomId?: string;
 };
 
-export function RoomStrawberryOverlay({ roomId }: Props) {
+export function RoomStrawberryOverlay({ roomId: roomIdProp }: Props) {
+  const { session } = useAuth();
+  const [roomId, setRoomId] = useState<string | null>(roomIdProp ?? null);
   const [berries, setBerries] = useState<RoomStrawberry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (roomIdProp) {
+      setRoomId(roomIdProp);
+      return;
+    }
+
+    const userId = session?.user.id;
+    if (!userId) return;
+
+    let active = true;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const findRoom = async () => {
+      try {
+        const roomSession = await fetchOwnActiveRoomSession(userId);
+        if (!active) return;
+        if (roomSession?.room_id) {
+          setRoomId(roomSession.room_id);
+          return;
+        }
+      } catch {
+        // The room screen may still be creating its room session.
+      }
+
+      attempts += 1;
+      if (active && attempts < 30) retryTimer = setTimeout(() => void findRoom(), 500);
+    };
+
+    void findRoom();
+
+    return () => {
+      active = false;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [roomIdProp, session?.user.id]);
+
+  useEffect(() => {
+    if (!roomId) return;
+
     let active = true;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
@@ -39,7 +82,7 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
         await refresh();
       } catch {
         attempts += 1;
-        if (active && attempts < 16) {
+        if (active && attempts < 30) {
           retryTimer = setTimeout(() => void seedAndRefresh(), 500);
         }
       }
@@ -74,6 +117,8 @@ export function RoomStrawberryOverlay({ roomId }: Props) {
       setClaimingId(null);
     }
   };
+
+  if (!roomId) return null;
 
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
