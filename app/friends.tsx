@@ -30,6 +30,7 @@ import {
   type Friend,
   type PendingFriendRequest,
 } from '../lib/friends';
+import { getLevelProgress } from '../lib/levels';
 
 export default function FriendsScreen() {
   const { session } = useAuth();
@@ -229,41 +230,45 @@ export default function FriendsScreen() {
                   <Text style={styles.emptyText}>好友還在路上，分享你的好友 ID 邀請他們吧～</Text>
                 </View>
               ) : (
-                friends.map((friend) => (
-                  <View key={friend.userId} style={styles.friendCard}>
-                    <View style={styles.friendCharacter}>
-                      <AnimalCharacter animal={friend.animal} size="regular" state="idle" />
-                    </View>
-                    <View style={styles.friendDetails}>
-                      <Text numberOfLines={1} style={styles.friendName}>{friend.nickname}</Text>
-                      <Text style={styles.friendStreak}>🔥 連續施工 {friend.streak} 天</Text>
-                      <View style={styles.friendActions}>
-                        <Pressable
-                          disabled={Boolean(action)}
-                          onPress={() => void handleRemindFriend(friend)}
-                          style={[styles.actionButton, friend.checkedInToday && styles.actionButtonMuted]}
-                        >
-                          {action === `remind:${friend.userId}` ? (
-                            <ActivityIndicator color="#805844" size="small" />
-                          ) : (
-                            <Text style={styles.actionText}>提醒打卡</Text>
-                          )}
-                        </Pressable>
-                        <Pressable
-                          disabled={Boolean(action)}
-                          onPress={() => void handleGiftStrawberry(friend)}
-                          style={[styles.actionButton, styles.giftButton]}
-                        >
-                          {action === `gift:${friend.userId}` ? (
-                            <ActivityIndicator color="#A54F61" size="small" />
-                          ) : (
-                            <Text style={[styles.actionText, styles.giftText]}>送草莓 🍓</Text>
-                          )}
-                        </Pressable>
+                friends.map((friend) => {
+                  const friendLevel = getLevelProgress(friend.totalCompletions);
+                  return (
+                    <View key={friend.userId} style={styles.friendCard}>
+                      <View style={styles.friendCharacter}>
+                        <AnimalCharacter animal={friend.animal} size="regular" state="idle" />
+                      </View>
+                      <View style={styles.friendDetails}>
+                        <Text numberOfLines={1} style={styles.friendName}>{friend.nickname}</Text>
+                        <Text style={styles.friendLevel}>Lv.{friendLevel.level} · {friendLevel.title}</Text>
+                        <Text style={styles.friendStreak}>🔥 連續施工 {friend.streak} 天</Text>
+                        <View style={styles.friendActions}>
+                          <Pressable
+                            disabled={Boolean(action)}
+                            onPress={() => void handleRemindFriend(friend)}
+                            style={[styles.actionButton, friend.checkedInToday && styles.actionButtonMuted]}
+                          >
+                            {action === `remind:${friend.userId}` ? (
+                              <ActivityIndicator color="#805844" size="small" />
+                            ) : (
+                              <Text style={styles.actionText}>提醒打卡</Text>
+                            )}
+                          </Pressable>
+                          <Pressable
+                            disabled={Boolean(action)}
+                            onPress={() => void handleGiftStrawberry(friend)}
+                            style={[styles.actionButton, styles.giftButton]}
+                          >
+                            {action === `gift:${friend.userId}` ? (
+                              <ActivityIndicator color="#A54F61" size="small" />
+                            ) : (
+                              <Text style={[styles.actionText, styles.giftText]}>送草莓 🍓</Text>
+                            )}
+                          </Pressable>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
 
@@ -350,6 +355,7 @@ const styles = StyleSheet.create({
   friendCharacter: { alignItems: 'center', backgroundColor: '#FFF7EF', borderRadius: 28, height: 58, justifyContent: 'center', width: 58 },
   friendDetails: { flex: 1, marginLeft: 12 },
   friendName: { color: '#4D3F36', fontSize: 15, fontWeight: '900' },
+  friendLevel: { color: '#A06F50', fontSize: 11, fontWeight: '900', marginTop: 2 },
   friendStreak: { color: '#927565', fontSize: 11, marginTop: 3 },
   friendActions: { flexDirection: 'row', gap: 7, marginTop: 9 },
   actionButton: { alignItems: 'center', backgroundColor: '#F5E8DD', borderRadius: 11, justifyContent: 'center', minHeight: 35, minWidth: 88, paddingHorizontal: 11 },
