@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAudioPlayer } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
 import { Platform, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 
 import {
   claimRoomStrawberry,
-  ensureRoomStrawberries,
   fetchRoomStrawberries,
   subscribeToRoomStrawberries,
   type RoomStrawberry,
@@ -19,9 +19,9 @@ type Props = {
 const PICKUP_SOUND = require('../assets/audio/strawberry-pickup.wav');
 
 function playLightHaptic() {
-  // Keep pickup feedback much lighter than support/punch feedback.
-  if (Platform.OS === 'android') Vibration.vibrate(10);
-  else if (Platform.OS === 'ios') Vibration.vibrate(1);
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
+    if (Platform.OS === 'android') Vibration.vibrate(10);
+  });
 }
 
 export function RoomStrawberryOverlay({ roomId, soundEnabled = true }: Props) {
@@ -44,17 +44,16 @@ export function RoomStrawberryOverlay({ roomId, soundEnabled = true }: Props) {
       if (active) setBerries(next);
     };
 
-    const seedAndRefresh = async () => {
+    const refreshWithRetry = async () => {
       try {
-        await ensureRoomStrawberries();
         await refresh();
       } catch {
         attempts += 1;
-        if (active && attempts < 30) retryTimer = setTimeout(() => void seedAndRefresh(), 500);
+        if (active && attempts < 30) retryTimer = setTimeout(() => void refreshWithRetry(), 500);
       }
     };
 
-    void seedAndRefresh();
+    void refreshWithRetry();
     const channel = subscribeToRoomStrawberries(roomId, () => {
       void refresh().catch(() => undefined);
     });

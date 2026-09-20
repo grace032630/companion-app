@@ -12,17 +12,12 @@ export type RoomStrawberry = {
 
 type RoomStrawberryRow = RoomStrawberry;
 
-export async function ensureRoomStrawberries() {
-  const { data, error } = await supabase.rpc('ensure_room_strawberries');
-  if (error) throw error;
-  return data === true;
-}
-
 export async function fetchRoomStrawberries(roomId: string) {
   const { data, error } = await supabase
     .from('room_strawberries')
     .select('id,room_id,x_percent,y_percent,source,spawned_at,claimed_by')
     .eq('room_id', roomId)
+    .eq('source', 'completion')
     .is('claimed_by', null)
     .order('spawned_at', { ascending: true });
 

@@ -35,7 +35,11 @@ function RootNavigator() {
       : <Redirect href="/" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="room" options={{ gestureEnabled: false }} />
+    </Stack>
+  );
 }
 
 export default function RootLayout() {

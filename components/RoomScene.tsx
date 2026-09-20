@@ -51,9 +51,11 @@ type RoomSceneProps = {
   finished?: boolean;
   elapsedTime?: string;
   collision?: RoomCollision | null;
+  onAvatarDragActiveChange?: (active: boolean) => void;
 };
 
 type RoomSpot = { left: `${number}%`; top: number };
+type DragBounds = { minX: number; maxX: number; minY: number; maxY: number };
 
 const ME_SPOT: RoomSpot = { left: '30%', top: 275 };
 const SPOTS: RoomSpot[] = [
@@ -74,7 +76,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function Worker({ member, state = 'working', spot, delay = 0, forceHelp = false, quote, controlsLocked = false, hidden = false, onDragPositionChange, celebrationText }: {
+function Worker({ member, state = 'working', spot, delay = 0, forceHelp = false, quote, controlsLocked = false, hidden = false, avatarScale = 1, workerWidth = 120, dragBounds, onDragActiveChange, onDragPositionChange, celebrationText }: {
   member: CrewMember;
   state?: AnimalAnimationState;
   spot: RoomSpot;
@@ -83,6 +85,10 @@ function Worker({ member, state = 'working', spot, delay = 0, forceHelp = false,
   quote?: string | null;
   controlsLocked?: boolean;
   hidden?: boolean;
+  avatarScale?: number;
+  workerWidth?: number;
+  dragBounds?: DragBounds;
+  onDragActiveChange?: (active: boolean) => void;
   onDragPositionChange?: (position: { x: number; y: number }) => void;
   celebrationText?: string;
 }) {
@@ -90,6 +96,7 @@ function Worker({ member, state = 'working', spot, delay = 0, forceHelp = false,
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const dragCurrent = useRef({ x: 0, y: 0 });
   const dragStart = useRef({ x: 0, y: 0 });
+  const bounds = dragBounds ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
   useEffect(() => {
     const shouldAutoMove = state === 'working' || forceHelp;
@@ -113,29 +120,32 @@ function Worker({ member, state = 'working', spot, delay = 0, forceHelp = false,
     () => PanResponder.create({
       onStartShouldSetPanResponder: () => Boolean(member.isMe && !controlsLocked),
       onMoveShouldSetPanResponder: (_, gesture) => Boolean(member.isMe && !controlsLocked && (Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3)),
-      onPanResponderGrant: () => { dragStart.current = { ...dragCurrent.current }; },
+      onPanResponderGrant: () => { dragStart.current = { ...dragCurrent.current };onDragActiveChange?.(true); },
       onPanResponderMove: (_, gesture) => {
         if (!member.isMe) return;
         drag.setValue({
-          x: clamp(dragStart.current.x + gesture.dx, -145, 95),
-          y: clamp(dragStart.current.y + gesture.dy, -25, 205),
+          x: clamp(dragStart.current.x + gesture.dx, bounds.minX, bounds.maxX),
+          y: clamp(dragStart.current.y + gesture.dy, bounds.minY, bounds.maxY),
         });
       },
       onPanResponderRelease: (_, gesture) => {
         if (!member.isMe) return;
         const next = {
-          x: clamp(dragStart.current.x + gesture.dx, -145, 95),
-          y: clamp(dragStart.current.y + gesture.dy, -25, 205),
+          x: clamp(dragStart.current.x + gesture.dx, bounds.minX, bounds.maxX),
+          y: clamp(dragStart.current.y + gesture.dy, bounds.minY, bounds.maxY),
         };
         dragCurrent.current = next;
         onDragPositionChange?.(next);
+        onDragActiveChange?.(false);
         Animated.spring(drag, { toValue: next, bounciness: 5, speed: 18, useNativeDriver: true }).start();
       },
       onPanResponderTerminate: () => {
+        onDragActiveChange?.(false);
         Animated.spring(drag, { toValue: dragCurrent.current, bounciness: 5, speed: 18, useNativeDriver: true }).start();
       },
+      onPanResponderTerminationRequest: () => false,
     }),
-    [controlsLocked, drag, member.isMe, onDragPositionChange],
+    [bounds.maxX, bounds.maxY, bounds.minX, bounds.minY, controlsLocked, drag, member.isMe, onDragActiveChange, onDragPositionChange],
   );
 
   const driftX = walk.interpolate({ inputRange: [0, 1], outputRange: [-5, 6] });
@@ -149,7 +159,7 @@ function Worker({ member, state = 'working', spot, delay = 0, forceHelp = false,
         styles.worker,
         member.isMe && styles.draggableWorker,
         hidden && styles.hiddenWorker,
-        { left: spot.left, top: spot.top, transform: [{ translateX: autoAndDragX }, { translateY: drag.y }] },
+        { left: spot.left, top: spot.top, width: workerWidth, transform: [{ translateX: autoAndDragX }, { translateY: drag.y }] },
       ]}
     >
       {celebrationText ? (
@@ -163,7 +173,7 @@ function Worker({ member, state = 'working', spot, delay = 0, forceHelp = false,
       ) : null}
 
       <View style={styles.workerBubbleRow}>
-        <AnimalCharacter animal={member.animal} scaleMultiplier={1.5} size="regular" state={forceHelp ? 'idle' : state} />
+        <AnimalCharacter animal={member.animal} scaleMultiplier={avatarScale} size="regular" state={forceHelp ? 'idle' : state} />
         {state === 'working' && <ConstructionAction action={member.action} emphasized={member.isMe} />}
       </View>
 
@@ -220,7 +230,7 @@ function CelebrationEffects() {
   );
 }
 
-function CollisionAnimation({ collision, actorPoint, targetPoint }: { collision: RoomCollision; actorPoint: { x: number; y: number }; targetPoint: { x: number; y: number } }) {
+function CollisionAnimation({ collision, actorPoint, targetPoint, avatarScale, workerWidth }: { collision: RoomCollision; actorPoint: { x: number; y: number }; targetPoint: { x: number; y: number }; avatarScale: number; workerWidth: number }) {
   const [actorMove] = useState(() => new Animated.ValueXY(actorPoint));
   const [targetMove] = useState(() => new Animated.ValueXY(targetPoint));
   const [impactScale] = useState(() => new Animated.Value(0));
@@ -238,8 +248,8 @@ function CollisionAnimation({ collision, actorPoint, targetPoint }: { collision:
 
     const dx = targetPoint.x - actorPoint.x;
     const direction = dx >= 0 ? 1 : -1;
-    const hitX = targetPoint.x - direction * 38;
-    const knockback = collision.kind === 'punch' ? 42 : 32;
+    const hitX = targetPoint.x - direction * 28 * avatarScale;
+    const knockback = (collision.kind === 'punch' ? 34 : 26) * avatarScale;
 
     const animation = Animated.sequence([
       Animated.timing(actorMove, { duration: 520, toValue: { x: hitX, y: targetPoint.y }, useNativeDriver: true }),
@@ -279,18 +289,18 @@ function CollisionAnimation({ collision, actorPoint, targetPoint }: { collision:
 
     animation.start();
     return () => animation.stop();
-  }, [actorMove, actorPoint.x, actorPoint.y, collision.id, collision.kind, impactScale, starOpacity, starScale, targetMove, targetPoint.x, targetPoint.y, targetRotate]);
+  }, [actorMove, actorPoint.x, actorPoint.y, avatarScale, collision.id, collision.kind, impactScale, starOpacity, starScale, targetMove, targetPoint.x, targetPoint.y, targetRotate]);
 
   const rotate = targetRotate.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-11deg', '0deg', '11deg'] });
 
   return (
     <View pointerEvents="none" style={styles.collisionLayer}>
-      <Animated.View style={[styles.collisionMovingActor, { transform: actorMove.getTranslateTransform() }]}>
-        <AnimalCharacter animal={collision.actor.animal} scaleMultiplier={1.5} size="regular" state="working" />
+      <Animated.View style={[styles.collisionMovingActor, { width: workerWidth, transform: actorMove.getTranslateTransform() }]}>
+        <AnimalCharacter animal={collision.actor.animal} scaleMultiplier={avatarScale} size="regular" state="working" />
         <Text style={styles.collisionName}>{collision.actor.name}</Text>
       </Animated.View>
 
-      <Animated.Text style={[styles.collisionImpact, { left: targetPoint.x + 46, top: targetPoint.y + 15, opacity: impactScale, transform: [{ scale: impactScale }] }]}>
+      <Animated.Text style={[styles.collisionImpact, { left: targetPoint.x + workerWidth * 0.38, top: targetPoint.y + 15, opacity: impactScale, transform: [{ scale: impactScale }] }]}>
         {collision.kind === 'punch' ? '💥' : '💨'}
       </Animated.Text>
 
@@ -298,18 +308,28 @@ function CollisionAnimation({ collision, actorPoint, targetPoint }: { collision:
         <Animated.Text style={[styles.punchStars, { left: targetPoint.x + 25, top: targetPoint.y - 26, opacity: starOpacity, transform: [{ scale: starScale }] }]}>⭐ ✨ ⭐</Animated.Text>
       ) : null}
 
-      <Animated.View style={[styles.collisionMovingTarget, { transform: [...targetMove.getTranslateTransform(), { rotate }] }]}>
-        <AnimalCharacter animal={collision.target.animal} scaleMultiplier={1.5} size="regular" state={collision.kind === 'punch' ? 'punched' : 'pushed'} />
+      <Animated.View style={[styles.collisionMovingTarget, { width: workerWidth, transform: [...targetMove.getTranslateTransform(), { rotate }] }]}>
+        <AnimalCharacter animal={collision.target.animal} scaleMultiplier={avatarScale} size="regular" state={collision.kind === 'punch' ? 'punched' : 'pushed'} />
         <Text style={styles.collisionName}>{collision.target.name}</Text>
       </Animated.View>
     </View>
   );
 }
 
-export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false, elapsedTime = '00:00', collision = null }: RoomSceneProps) {
-  const [sceneWidth, setSceneWidth] = useState(0);
+export function RoomScene({ me, helpers, myState, task, quote, askingHelp = false, finished = false, elapsedTime = '00:00', collision = null, onAvatarDragActiveChange }: RoomSceneProps) {
+  const [sceneSize, setSceneSize] = useState({ width: 0, height: 610 });
   const [meDragOffset, setMeDragOffset] = useState({ x: 0, y: 0 });
   const [roomBackground] = useState(() => pickRoomBackground());
+  const sceneWidth = sceneSize.width || 390;
+  const workerWidth = clamp(sceneWidth * 0.32, 104, 150);
+  const avatarScale = clamp(sceneWidth / 390, 0.9, 1.5);
+  const meBaseX = percentToNumber(ME_SPOT.left) * sceneWidth;
+  const dragBounds: DragBounds = {
+    minX: 12 - meBaseX,
+    maxX: sceneWidth - 12 - workerWidth - meBaseX,
+    minY: -sceneSize.height * 0.12,
+    maxY: sceneSize.height - ME_SPOT.top - 95,
+  };
 
   const resolveSpot = (participant: RoomCollision['actor'] | RoomCollision['target']) => {
     const isMe = participant.memberId === me.id || Boolean(participant.userId && participant.userId === me.userId);
@@ -328,7 +348,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
 
   return (
     <ImageBackground
-      onLayout={(event) => setSceneWidth(event.nativeEvent.layout.width)}
+      onLayout={(event) => setSceneSize(event.nativeEvent.layout)}
       source={roomBackground}
       resizeMode="cover"
       style={[styles.scene, askingHelp && styles.sceneHelp, finished && styles.sceneDone]}
@@ -347,6 +367,10 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         delay={120}
         forceHelp={askingHelp}
         quote={quote}
+        avatarScale={avatarScale}
+        workerWidth={workerWidth}
+        dragBounds={dragBounds}
+        onDragActiveChange={onAvatarDragActiveChange}
         controlsLocked={Boolean(collision) || finished}
         hidden={Boolean(collision && (collision.actor.memberId === me.id || collision.target.memberId === me.id || collision.actor.userId === me.userId || collision.target.userId === me.userId))}
         onDragPositionChange={setMeDragOffset}
@@ -360,6 +384,8 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
           spot={SPOTS[index]}
           delay={index * 170 + 80}
           quote={member.isNpc ? null : member.quote}
+          avatarScale={avatarScale}
+          workerWidth={workerWidth}
           controlsLocked={Boolean(collision) || finished}
           hidden={Boolean(collision && (
             collision.actor.memberId === member.id
@@ -371,7 +397,7 @@ export function RoomScene({ me, helpers, myState, task, quote, askingHelp = fals
         />
       ))}
 
-      {collision && sceneWidth > 0 ? <CollisionAnimation collision={collision} actorPoint={actorPoint} targetPoint={targetPoint} /> : null}
+      {collision && sceneWidth > 0 ? <CollisionAnimation collision={collision} actorPoint={actorPoint} targetPoint={targetPoint} avatarScale={avatarScale} workerWidth={workerWidth} /> : null}
       {finished ? <CelebrationEffects /> : null}
       {askingHelp && <View style={styles.helpSign}><Text style={styles.helpSignText}>！</Text></View>}
     </ImageBackground>
