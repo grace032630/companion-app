@@ -21,8 +21,7 @@ const TASKS=['打掃','寫報告','讀書','工作','運動','做家事','整理
 const SUPPORT_MESSAGES=['欸~~都進來了~就差真的動手了！','手機先放下 現在就行動','先碰它一下就好 不要想整件事','先做兩分鐘嘛~~試試看','起來啦！先做第一步~~','現在就去 我在這裡等你！','不要等有動力 動了再說','先做再說！','想一千次~不如努力的去試一次','有自信地朝你的夢想前進，過你想像中的生活','今天要做一些未來的你會感謝自己的事~','今天的我沒有極限','最佳的報復是巨大的成功','開始的方法就是停止空談並開始行動','Actions speak louder than words','我絕對不會放棄我自己 沒有你想像中困難','行動是治癒恐懼的良藥','手機裡的每一分鐘，都是你用現實人生的意義換來的','現在，站起來去喝一杯水','把螢幕按熄，扣在桌上','出門！出門！看看這世界！','你滑掉的是時間，消耗的是你的人生'];
 const ROOM_CAPACITY=6,HEARTBEAT_MS=20_000,COMPLETE_EXIT_MS=3500,ROOM_MAX_DURATION_MS=24*60*60*1000,COMPLETION_NOTICE_MS=3000,COLLISION_MS=2200;
 const ROOM_BGM_TRACKS=[{source:require('../assets/audio/room-bgm.mp3'),volume:.45},{source:require('../assets/audio/room-bgm-2.mp3'),volume:.181},{source:require('../assets/audio/room-bgm-3.mp3'),volume:.239},{source:require('../assets/audio/room-bgm-4.mp3'),volume:.22},{source:require('../assets/audio/room-bgm-5.mp3'),volume:.25}] as const;
-// Pending product asset: replace null with require('../assets/audio/task-complete.wav').
-const COMPLETION_SOUND: AudioSource = null;
+const COMPLETION_SOUND: AudioSource = require('../assets/audio/task-complete.wav');
 type Task=(typeof TASKS)[number];
 type BoardItem={id:string;animal:string;name:string;text:string;kind:RoomStatus;helper:boolean;targetUserId?:string;requestId?:string|null};
 function pick<T>(items:readonly T[]):T{return items[Math.floor(Math.random()*items.length)];}
